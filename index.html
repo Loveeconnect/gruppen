@@ -155,6 +155,21 @@
      <input class="ag-input" id="regName" type="text" placeholder="z.B. MaxMuster" maxlength="30" />
     </div>
     <div class="ag-field" style="margin-bottom:12px">
+     <label class="ag-label">Geschlecht</label>
+     <div style="display:flex;gap:10px;">
+      <button type="button" class="gender-btn" id="genderMale" data-gender="male" onclick="selectGender('male')" style="
+       flex:1;padding:10px;border-radius:12px;border:1px solid rgba(255,77,141,0.2);
+       background:transparent;color:#9b87b0;font-size:22px;cursor:pointer;
+       transition:all 0.2s;font-family:'DM Sans',sans-serif;
+      ">👨<br><span style="font-size:11px;">Mann</span></button>
+      <button type="button" class="gender-btn" id="genderFemale" data-gender="female" onclick="selectGender('female')" style="
+       flex:1;padding:10px;border-radius:12px;border:1px solid rgba(255,77,141,0.2);
+       background:transparent;color:#9b87b0;font-size:22px;cursor:pointer;
+       transition:all 0.2s;font-family:'DM Sans',sans-serif;
+      ">👩<br><span style="font-size:11px;">Frau</span></button>
+     </div>
+    </div>
+    <div class="ag-field" style="margin-bottom:12px">
      <label class="ag-label">E-Mail</label>
      <input class="ag-input" id="regEmail" type="email" placeholder="deine@email.de" />
     </div>
@@ -294,19 +309,21 @@
  </div>
  <!-- BURBUJA FLOTANTE -->
  <div id="chatPulseRing"></div>
- <button id="chatToggle" aria-label="Support-Chat öffnen">
-💬
+ <button id="chatToggle" aria-label="Support-Chat öffnen" style="padding:0;overflow:hidden;">
+<img src="https://i.imgur.com/93iSFXg.jpeg" alt="Support" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />
 <span id="notifBadge" style="display:none">1</span>
 </button>
  <div id="chatWindow" role="dialog" aria-label="Chat mit LoveConnect Support">
   <div class="cw-topbar">
    <div class="cw-avatar-wrap">
-    <div class="cw-avatar">🎧</div>
+    <div class="cw-avatar" style="padding:0;overflow:hidden;">
+     <img src="https://i.imgur.com/93iSFXg.jpeg" alt="Loresmitt" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />
+    </div>
     <div class="cw-online" id="cwOnlineDot"></div>
    </div>
    <div>
-    <div class="cw-name">LoveConnect Support</div>
-    <div class="cw-status" id="cwStatusText">● Team antwortet in Kürze</div>
+    <div class="cw-name">Loresmitt <span style="font-size:11px;color:#b06af3;font-family:'DM Mono';">(Telegram)</span></div>
+    <div class="cw-status" id="cwStatusText">● Support</div>
    </div>
    <button id="closeChat" aria-label="Cerrar chat">✕</button>
   </div>
@@ -1711,7 +1728,7 @@ function renderUserMessages(docs) {
     const row = document.createElement('div');
     if (m.sender === 'admin') {
       row.className = 'cw-msg';
-      row.innerHTML = `<div class="cw-m-avatar">🎧</div>
+      row.innerHTML = `<div class="cw-m-avatar" style="padding:0;overflow:hidden;"><img src="https://i.imgur.com/93iSFXg.jpeg" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" /></div>
         <div class="cw-bubble">${escapeHtml(m.text)}</div>`;
     } else {
       row.style.cssText = 'display:flex; justify-content:flex-end; animation:fadeUp 0.3s ease;';
@@ -2034,6 +2051,25 @@ window.addEventListener('load', () => {
 
 
 
+/* ── Gender selector ── */
+window._selectedGender = '';
+window.selectGender = function(g) {
+  window._selectedGender = g;
+  ['male','female'].forEach(id => {
+    const btn = document.getElementById('gender' + (id === 'male' ? 'Male' : 'Female'));
+    if (!btn) return;
+    if (id === g) {
+      btn.style.borderColor = 'var(--rose)';
+      btn.style.background  = 'rgba(255,77,141,0.1)';
+      btn.style.color       = '#fff';
+    } else {
+      btn.style.borderColor = 'rgba(255,77,141,0.2)';
+      btn.style.background  = 'transparent';
+      btn.style.color       = '#9b87b0';
+    }
+  });
+};
+
 /* ── Add Group Banner sparkles ── */
 (function(){
   const banner = document.querySelector('.add-group-banner');
@@ -2083,7 +2119,14 @@ window.addEventListener('load', () => {
   }
 
   function openAuth()    { authOverlay.classList.add('open'); }
-  function closeAuth()   { authOverlay.classList.remove('open'); }
+  function closeAuth()   {
+    authOverlay.classList.remove('open');
+    window._selectedGender = '';
+    ['genderMale','genderFemale'].forEach(id => {
+      const b = document.getElementById(id);
+      if (b) { b.style.borderColor='rgba(255,77,141,0.2)'; b.style.background='transparent'; b.style.color='#9b87b0'; }
+    });
+  }
   function openProfile() { fillProfile(); profileOverlay.classList.add('open'); }
   function closeProfile(){ profileOverlay.classList.remove('open'); }
 
@@ -2104,12 +2147,36 @@ window.addEventListener('load', () => {
     if (!user) return;
 
     document.getElementById('profileUsername').textContent = user.displayName || 'Benutzer';
-    document.getElementById('profileEmail').textContent    = user.email;
-    const avatars = ['💕','🌹','✨','💎','🦋','🔥','💘','🌟'];
-    document.getElementById('profileAvatar').textContent   = avatars[user.email.charCodeAt(0) % avatars.length];
+    // Ocultar el email real del admin, mostrar alias
+    if (isAdminUser(user)) {
+      document.getElementById('profileEmail').textContent = 'Loresmitt · Support';
+    } else {
+      document.getElementById('profileEmail').textContent = user.email;
+    }
+
+    // Género: buscar en Firestore si está guardado
+    const fb2 = window._fb;
+    let gender = localStorage.getItem('lc_gender_' + user.uid) || '';
+    if (!gender) {
+      try {
+        const uSnap = await fb2.getDocs(fb2.query(fb2.collection(fb2.db, 'users'), fb2.where('uid','==', user.uid)));
+        uSnap.forEach(d => { if (d.data().gender) gender = d.data().gender; });
+        if (gender) localStorage.setItem('lc_gender_' + user.uid, gender);
+      } catch(e) {}
+    }
 
     if (isAdminUser(user)) {
-      document.getElementById('profileAvatar').textContent = '🛠';
+      const avEl = document.getElementById('profileAvatar');
+      avEl.textContent = '';
+      avEl.style.padding = '0';
+      avEl.style.overflow = 'hidden';
+      avEl.innerHTML = '<img src="https://i.imgur.com/93iSFXg.jpeg" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />';
+    } else if (gender === 'male') {
+      document.getElementById('profileAvatar').textContent = '👨';
+    } else if (gender === 'female') {
+      document.getElementById('profileAvatar').textContent = '👩';
+    } else {
+      document.getElementById('profileAvatar').textContent = '👤';
     }
 
     const container = document.getElementById('profileGroups');
@@ -2219,19 +2286,26 @@ window.addEventListener('load', () => {
     });
 
     document.getElementById('regSubmit').addEventListener('click', async () => {
-      const name  = document.getElementById('regName').value.trim();
-      const email = document.getElementById('regEmail').value.trim();
-      const pass  = document.getElementById('regPass').value;
-      const err   = document.getElementById('regError');
-      const btn   = document.getElementById('regSubmit');
+      const name   = document.getElementById('regName').value.trim();
+      const email  = document.getElementById('regEmail').value.trim();
+      const pass   = document.getElementById('regPass').value;
+      const gender = window._selectedGender || '';
+      const err    = document.getElementById('regError');
+      const btn    = document.getElementById('regSubmit');
       err.textContent = '';
       if (!name)               { err.textContent = 'Bitte Benutzernamen eingeben.'; return; }
+      if (!gender)             { err.textContent = 'Bitte wähle dein Geschlecht.'; return; }
       if (!email.includes('@')){ err.textContent = 'Bitte gültige E-Mail eingeben.'; return; }
       if (pass.length < 6)     { err.textContent = 'Passwort muss mindestens 6 Zeichen haben.'; return; }
       btn.disabled = true; btn.textContent = '⏳ Registrieren...';
       try {
         const cred = await fb.createUserWithEmailAndPassword(fb.auth, email, pass);
         await fb.updateProfile(cred.user, { displayName: name });
+        // Guardar género en Firestore y localStorage
+        await fb.setDoc(fb.doc(fb.db, 'users', cred.user.uid), {
+          uid: cred.user.uid, name, email, gender, createdAt: fb.serverTimestamp()
+        });
+        localStorage.setItem('lc_gender_' + cred.user.uid, gender);
         closeAuth();
         updateHeaderBtn(cred.user);
         showToast('✦ Konto erstellt! Willkommen, ' + name + '!');
@@ -2335,7 +2409,9 @@ window.addEventListener('load', () => {
     // La burbuja del chat muestra un ícono de soporte
     const chatToggleEl = document.getElementById('chatToggle');
     if (chatToggleEl) {
-      chatToggleEl.innerHTML = '🎧<span id="notifBadge" style="display:none">1</span>';
+      chatToggleEl.style.padding = '0';
+      chatToggleEl.style.overflow = 'hidden';
+      chatToggleEl.innerHTML = '<img src="https://i.imgur.com/93iSFXg.jpeg" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;" /><span id="notifBadge" style="display:none">1</span>';
       chatToggleEl.title = 'Support-Panel öffnen';
     }
     startListeningConversations();
