@@ -11,7 +11,7 @@
   import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-app.js";
   import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, GoogleAuthProvider, signInWithPopup }
     from "https://www.gstatic.com/firebasejs/11.9.0/firebase-auth.js";
-  import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, setDoc, updateDoc, increment, query, where, orderBy, onSnapshot, serverTimestamp }
+  import { getFirestore, collection, addDoc, getDocs, getDoc, deleteDoc, doc, setDoc, updateDoc, increment, query, where, orderBy, onSnapshot, serverTimestamp }
     from "https://www.gstatic.com/firebasejs/11.9.0/firebase-firestore.js";
   import { getStorage, ref, uploadBytes, getDownloadURL }
     from "https://www.gstatic.com/firebasejs/11.9.0/firebase-storage.js";
@@ -34,7 +34,7 @@
   // Expose to global scope so the inline script can use them
   window._fb = { auth, db, storage, createUserWithEmailAndPassword, signInWithEmailAndPassword,
     signOut, onAuthStateChanged, updateProfile, GoogleAuthProvider, signInWithPopup,
-    collection, addDoc, getDocs, deleteDoc, doc, setDoc, updateDoc, increment, query, where, orderBy, onSnapshot, serverTimestamp,
+    collection, addDoc, getDocs, getDoc, deleteDoc, doc, setDoc, updateDoc, increment, query, where, orderBy, onSnapshot, serverTimestamp,
     ref, uploadBytes, getDownloadURL };
  </script>
 </head>
@@ -1887,7 +1887,7 @@ document.getElementById('lightboxOverlay').addEventListener('click', () => {
    ║  Consíguela en: https://api.imgbb.com/  (botón           ║
    ║  "Get API Key", requiere solo una cuenta gratis)          ║
    ╚══════════════════════════════════════════════════════════╝ */
-const IMGBB_API_KEY = 'e7b47f40a48d8068ecb699153e244dcb';
+const IMGBB_API_KEY = 'PON_AQUI_TU_API_KEY_DE_IMGBB';
 
 /* Convierte un File a string base64 (sin el prefijo "data:image/...;base64,") */
 function fileToBase64(file) {
@@ -2409,21 +2409,21 @@ window.selectGender = function(g) {
       document.getElementById('profileEmail').textContent = user.email;
     }
 
-    // Género: buscar en Firestore si está guardado
+    // Género, portada y foto guardados en Firestore: se leen directamente por uid (ID del documento)
     const fb2 = window._fb;
     let gender = localStorage.getItem('lc_gender_' + user.uid) || '';
     let savedCoverUrl = '';
-    {
-      try {
-        const uSnap = await fb2.getDocs(fb2.query(fb2.collection(fb2.db, 'users'), fb2.where('uid','==', user.uid)));
-        uSnap.forEach(d => {
-          const data = d.data();
-          if (data.gender) gender = data.gender;
-          if (data.coverUrl) savedCoverUrl = data.coverUrl;
-        });
+    let savedPhotoUrl = '';
+    try {
+      const uDocSnap = await fb2.getDoc(fb2.doc(fb2.db, 'users', user.uid));
+      if (uDocSnap.exists()) {
+        const data = uDocSnap.data();
+        if (data.gender)   gender = data.gender;
+        if (data.coverUrl) savedCoverUrl = data.coverUrl;
+        if (data.photoUrl) savedPhotoUrl = data.photoUrl;
         if (gender) localStorage.setItem('lc_gender_' + user.uid, gender);
-      } catch(e) {}
-    }
+      }
+    } catch(e) { console.error('fillProfile: error leyendo users/' + user.uid, e); }
 
     // Portada (cover): foto guardada por el usuario, si existe
     const coverEl = document.getElementById('profileCover');
@@ -2437,12 +2437,12 @@ window.selectGender = function(g) {
       avEl.style.padding = '0';
       avEl.style.overflow = 'hidden';
       avEl.innerHTML = '<img src="https://i.imgur.com/93iSFXg.jpeg" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />';
-    } else if (user.photoURL) {
-      // El usuario subió una foto de perfil propia
+    } else if (user.photoURL || savedPhotoUrl) {
+      // El usuario subió una foto de perfil propia (de Auth, o como respaldo la guardada en Firestore)
       avEl.textContent = '';
       avEl.style.padding = '0';
       avEl.style.overflow = 'hidden';
-      avEl.innerHTML = `<img src="${user.photoURL}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />`;
+      avEl.innerHTML = `<img src="${user.photoURL || savedPhotoUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />`;
     } else if (gender === 'male') {
       avEl.style.padding = ''; avEl.style.overflow = '';
       avEl.innerHTML = '';
