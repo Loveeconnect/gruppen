@@ -6,6 +6,33 @@
  <meta name="viewport" content="width=device-width, initial-scale=1.0">
  <title>LoveConnect 💕</title>
  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=DM+Sans:wght@300;400;500&family=DM+Mono&family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet">
+ <!-- Firebase SDK -->
+ <script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-app.js";
+  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, GoogleAuthProvider, signInWithPopup }
+    from "https://www.gstatic.com/firebasejs/11.9.0/firebase-auth.js";
+  import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, setDoc, updateDoc, increment, query, where, orderBy, onSnapshot, serverTimestamp }
+    from "https://www.gstatic.com/firebasejs/11.9.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyCWK5HPorZc4qMkbALonPcdrkm5Pguk9Ic",
+    authDomain: "futbol-premier-ae4aa.firebaseapp.com",
+    projectId: "futbol-premier-ae4aa",
+    storageBucket: "futbol-premier-ae4aa.firebasestorage.app",
+    messagingSenderId: "668397444118",
+    appId: "1:668397444118:web:ad1797cadc4734a0db2937",
+    measurementId: "G-GEFBJPPXTG"
+  };
+
+  const app  = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db   = getFirestore(app);
+
+  // Expose to global scope so the inline script can use them
+  window._fb = { auth, db, createUserWithEmailAndPassword, signInWithEmailAndPassword,
+    signOut, onAuthStateChanged, updateProfile, GoogleAuthProvider, signInWithPopup,
+    collection, addDoc, getDocs, deleteDoc, doc, setDoc, updateDoc, increment, query, where, orderBy, onSnapshot, serverTimestamp };
+ </script>
 </head>
 
 <body>
@@ -20,7 +47,7 @@
      <button class="pill" data-filter="Freunde">Freunde</button>
      <button class="pill" data-filter="Dating">Dating</button>
     </div>
-
+    <button class="auth-header-btn" id="authHeaderBtn">👤 Anmelden</button>
    </div>
   </div>
  </header>
@@ -44,6 +71,27 @@
       <div class="stat-label">Immer aktiv</div>
      </div>
     </div>
+
+   <!-- QUICK ADD CARDS -->
+   <div class="quick-add-row">
+    <div class="quick-add-card quick-add-wa" id="quickAddWa">
+     <div class="qa-icon">💬</div>
+     <div class="qa-info">
+      <div class="qa-title">WhatsApp Gruppe hinzufügen</div>
+      <div class="qa-sub">Teile deinen Einladungslink mit der Community</div>
+     </div>
+     <button class="qa-btn qa-btn-wa" id="openAddGroup">+ Hinzufügen</button>
+    </div>
+    <div class="quick-add-card quick-add-tg" id="quickAddTg">
+     <div class="qa-icon">✈️</div>
+     <div class="qa-info">
+      <div class="qa-title">Telegram Gruppe hinzufügen</div>
+      <div class="qa-sub">Verbinde deine Telegram-Community</div>
+     </div>
+     <button class="qa-btn qa-btn-tg" id="openAddGroup2">+ Hinzufügen</button>
+    </div>
+   </div>
+
    </section>
 
     <div class="section-title">✦ Ausgewählte Gruppen</div>
@@ -67,76 +115,175 @@
   </div>
  </footer>
  <!-- SECCIÓN AÑADIR GRUPO -->
+ <!-- AUTH MODAL -->
+ <div id="authOverlay" class="auth-overlay">
+  <div class="auth-modal">
+   <button class="ag-close auth-close" id="closeAuth">✕</button>
+   <!-- Tabs -->
+   <div class="auth-tabs">
+    <button class="auth-tab active" data-tab="login">Anmelden</button>
+    <button class="auth-tab" data-tab="register">Registrieren</button>
+   </div>
+
+   <!-- LOGIN PANEL -->
+   <div class="auth-panel" id="panelLogin">
+    <div class="auth-header-logo">LoveConnect 💕</div>
+    <p class="auth-sub">Willkommen zurück! Melde dich an.</p>
+    <div class="ag-field" style="margin-bottom:12px">
+     <label class="ag-label">E-Mail</label>
+     <input class="ag-input" id="loginEmail" type="email" placeholder="deine@email.de" />
+    </div>
+    <div class="ag-field" style="margin-bottom:18px">
+     <label class="ag-label">Passwort</label>
+     <input class="ag-input" id="loginPass" type="password" placeholder="••••••••" />
+    </div>
+    <div class="auth-error" id="loginError"></div>
+    <button class="ag-submit" id="loginSubmit" style="width:100%;margin-top:4px">✦ Anmelden</button>
+    <div class="auth-divider"><span>oder</span></div>
+    <button class="google-btn" id="googleLoginBtn" type="button">
+     <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.1 8 3l5.7-5.7C34.5 6.1 29.6 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.7-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 16 18.9 13 24 13c3.1 0 5.8 1.1 8 3l5.7-5.7C34.5 7.1 29.6 5 24 5c-7.7 0-14.3 4.4-17.7 9.7z"/><path fill="#4CAF50" d="M24 44c5.5 0 10.3-1.8 13.8-5l-6.4-5.4C29.4 35 26.8 36 24 36c-5.3 0-9.7-3.3-11.3-8l-6.6 5.1C9.6 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.2-4.2 5.6l6.4 5.4C40.9 36.4 44 30.8 44 24c0-1.3-.1-2.7-.4-3.5z"/></svg>
+     <span>Mit Google anmelden</span>
+    </button>
+   </div>
+
+   <!-- REGISTER PANEL -->
+   <div class="auth-panel" id="panelRegister" style="display:none">
+    <div class="auth-header-logo">LoveConnect 💕</div>
+    <p class="auth-sub">Erstelle dein kostenloses Konto.</p>
+    <div class="ag-field" style="margin-bottom:12px">
+     <label class="ag-label">Benutzername</label>
+     <input class="ag-input" id="regName" type="text" placeholder="z.B. MaxMuster" maxlength="30" />
+    </div>
+    <div class="ag-field" style="margin-bottom:12px">
+     <label class="ag-label">E-Mail</label>
+     <input class="ag-input" id="regEmail" type="email" placeholder="deine@email.de" />
+    </div>
+    <div class="ag-field" style="margin-bottom:18px">
+     <label class="ag-label">Passwort</label>
+     <input class="ag-input" id="regPass" type="password" placeholder="Mindestens 6 Zeichen" />
+    </div>
+    <div class="auth-error" id="regError"></div>
+    <button class="ag-submit" id="regSubmit" style="width:100%;margin-top:4px">✦ Konto erstellen</button>
+    <div class="auth-divider"><span>oder</span></div>
+    <button class="google-btn" id="googleRegBtn" type="button">
+     <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.1 8 3l5.7-5.7C34.5 6.1 29.6 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.7-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 16 18.9 13 24 13c3.1 0 5.8 1.1 8 3l5.7-5.7C34.5 7.1 29.6 5 24 5c-7.7 0-14.3 4.4-17.7 9.7z"/><path fill="#4CAF50" d="M24 44c5.5 0 10.3-1.8 13.8-5l-6.4-5.4C29.4 35 26.8 36 24 36c-5.3 0-9.7-3.3-11.3-8l-6.6 5.1C9.6 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.2-4.2 5.6l6.4 5.4C40.9 36.4 44 30.8 44 24c0-1.3-.1-2.7-.4-3.5z"/></svg>
+     <span>Mit Google registrieren</span>
+    </button>
+   </div>
+  </div>
+ </div>
+
+ <!-- PROFILE MODAL -->
+ <div id="profileOverlay" class="auth-overlay">
+  <div class="auth-modal profile-modal">
+   <button class="ag-close auth-close" id="closeProfile" style="z-index:2;">✕</button>
+   <div class="profile-banner">
+    <div class="profile-avatar" id="profileAvatar">👤</div>
+    <div class="profile-username" id="profileUsername">Benutzer</div>
+    <div class="profile-email" id="profileEmail">email@beispiel.de</div>
+    <div class="profile-stats-row">
+     <div class="profile-stat">
+      <div class="profile-stat-num" id="profileGroupCount">0</div>
+      <div class="profile-stat-label">Gruppen</div>
+     </div>
+     <div class="profile-stat">
+      <div class="profile-stat-num">✓</div>
+      <div class="profile-stat-label">Verifiziert</div>
+     </div>
+    </div>
+   </div>
+   <div class="profile-body">
+    <div class="profile-section-title">✦ Meine hinzugefügten Gruppen</div>
+    <div class="profile-groups" id="profileGroups">
+     <div class="profile-empty">Du hast noch keine Gruppen hinzugefügt.</div>
+    </div>
+    <button class="ag-cancel" id="logoutBtn" style="width:100%;margin-top:18px">← Abmelden</button>
+   </div>
+  </div>
+ </div>
+
  <!-- MODAL AÑADIR GRUPO -->
- <div id="addGroupOverlay" class="ag-overlay">
-  <div class="ag-modal" role="dialog" aria-label="Gruppe hinzufügen">
+
+ <!-- MODAL WHATSAPP -->
+ <div id="modalWa" class="ag-overlay">
+  <div class="ag-modal" role="dialog">
    <div class="ag-modal-header">
     <div>
-     <div class="ag-modal-sub">✦ Community</div>
+     <div class="ag-modal-sub" style="color:#25d366">💬 WhatsApp</div>
      <div class="ag-modal-title">Gruppe hinzufügen</div>
     </div>
-    <button class="ag-close" id="closeAddGroup" aria-label="Cerrar">✕</button>
-   </div>
-   <div class="ag-platform-row">
-    <button class="ag-plat-btn active" data-plat="wa" id="platWa">
-<span class="ag-plat-icon">💬</span>
-<span>WhatsApp</span>
-</button>
-    <button class="ag-plat-btn" data-plat="tg" id="platTg">
-<span class="ag-plat-icon">✈️</span>
-<span>Telegram</span>
-</button>
+    <button class="ag-close" id="closeWa">✕</button>
    </div>
    <div class="ag-form">
     <div class="ag-field">
      <label class="ag-label">Gruppenname *</label>
-     <input class="ag-input" id="ag-name" type="text" placeholder="z.B. Dating Deutschland 🇩🇪" maxlength="60" />
+     <input class="ag-input" id="wa-name" type="text" placeholder="z.B. Dating Deutschland 🇩🇪" maxlength="60" />
     </div>
     <div class="ag-field">
      <label class="ag-label">Beschreibung *</label>
-     <textarea class="ag-input ag-textarea" id="ag-desc" placeholder="Beschreibe deine Gruppe in wenigen Worten..." maxlength="160" rows="3"></textarea>
-     <div class="ag-char-count"><span id="agDescCount">0</span>/160</div>
+     <textarea class="ag-input ag-textarea" id="wa-desc" placeholder="Beschreibe deine Gruppe in wenigen Worten..." maxlength="160" rows="3"></textarea>
+     <div class="ag-char-count"><span id="waDescCount">0</span>/160</div>
     </div>
-    <div class="ag-field-row">
-     <div class="ag-field">
-      <label class="ag-label">Kategorie *</label>
-      <select class="ag-input ag-select" id="ag-cat">
-<option value="">— wählen —</option>
-<option value="Dating">🔞 +18 Dating</option>
-<option value="Freunde">🤝 Freunde</option>
-</select>
-     </div>
-     <div class="ag-field">
-      <label class="ag-label">Mitglieder (ca.)</label>
-      <input class="ag-input" id="ag-members" type="text" placeholder="z.B. 1.200" maxlength="12" />
+    <div class="ag-field">
+     <label class="ag-label">Kategorie *</label>
+     <div class="ag-cat-row">
+      <button class="ag-cat-btn" data-cat="" data-form="wa">— wählen —</button>
+      <button class="ag-cat-btn" data-cat="Freunde" data-form="wa">🤝 Freunde</button>
+      <button class="ag-cat-btn" data-cat="Dating" data-form="wa">🔞 +18 Dating</button>
      </div>
     </div>
     <div class="ag-field">
-     <label class="ag-label">Einladungslink *</label>
-     <input class="ag-input" id="ag-link" type="url" placeholder="https://chat.whatsapp.com/... o https://t.me/..." />
-    </div>
-    <div class="ag-field">
-     <label class="ag-label">Emoji / Icon</label>
-     <div class="ag-emoji-grid" id="agEmojiGrid">
-      <button class="ag-emoji active" data-e="🇩🇪">🇩🇪</button>
-      <button class="ag-emoji" data-e="💘">💘</button>
-      <button class="ag-emoji" data-e="🔥">🔥</button>
-      <button class="ag-emoji" data-e="💬">💬</button>
-      <button class="ag-emoji" data-e="🌹">🌹</button>
-      <button class="ag-emoji" data-e="✨">✨</button>
-      <button class="ag-emoji" data-e="🎉">🎉</button>
-      <button class="ag-emoji" data-e="🌍">🌍</button>
-      <button class="ag-emoji" data-e="💎">💎</button>
-      <button class="ag-emoji" data-e="🦋">🦋</button>
-      <button class="ag-emoji" data-e="🎭">🎭</button>
-      <button class="ag-emoji" data-e="👥">👥</button>
-     </div>
+     <label class="ag-label">WhatsApp Einladungslink *</label>
+     <input class="ag-input" id="wa-link" type="url" placeholder="https://chat.whatsapp.com/..." />
+     <div class="ag-link-hint">Nur Links von chat.whatsapp.com werden akzeptiert</div>
     </div>
    </div>
-   <div class="ag-error" id="agError"></div>
+   <div class="ag-error" id="waError"></div>
    <div class="ag-actions">
-    <button class="ag-cancel" id="agCancel">Abbrechen</button>
-    <button class="ag-submit" id="agSubmit">✦ Gruppe veröffentlichen</button>
+    <button class="ag-cancel" id="waCancel">Abbrechen</button>
+    <button class="ag-submit ag-submit-wa" id="waSubmit">💬 Gruppe veröffentlichen</button>
+   </div>
+  </div>
+ </div>
+
+ <!-- MODAL TELEGRAM -->
+ <div id="modalTg" class="ag-overlay">
+  <div class="ag-modal" role="dialog">
+   <div class="ag-modal-header">
+    <div>
+     <div class="ag-modal-sub" style="color:#26a0da">✈️ Telegram</div>
+     <div class="ag-modal-title">Gruppe / Kanal hinzufügen</div>
+    </div>
+    <button class="ag-close" id="closeTg">✕</button>
+   </div>
+   <div class="ag-form">
+    <div class="ag-field">
+     <label class="ag-label">Gruppenname *</label>
+     <input class="ag-input" id="tg-name" type="text" placeholder="z.B. Dating Deutschland 🇩🇪" maxlength="60" />
+    </div>
+    <div class="ag-field">
+     <label class="ag-label">Beschreibung *</label>
+     <textarea class="ag-input ag-textarea" id="tg-desc" placeholder="Beschreibe deine Gruppe oder deinen Kanal..." maxlength="160" rows="3"></textarea>
+     <div class="ag-char-count"><span id="tgDescCount">0</span>/160</div>
+    </div>
+    <div class="ag-field">
+     <label class="ag-label">Kategorie *</label>
+     <div class="ag-cat-row">
+      <button class="ag-cat-btn" data-cat="" data-form="tg">— wählen —</button>
+      <button class="ag-cat-btn" data-cat="Freunde" data-form="tg">🤝 Freunde</button>
+      <button class="ag-cat-btn" data-cat="Dating" data-form="tg">🔞 +18 Dating</button>
+     </div>
+    </div>
+    <div class="ag-field">
+     <label class="ag-label">Telegram Einladungslink *</label>
+     <input class="ag-input" id="tg-link" type="url" placeholder="https://t.me/..." />
+     <div class="ag-link-hint">Nur Links von t.me werden akzeptiert</div>
+    </div>
+   </div>
+   <div class="ag-error" id="tgError"></div>
+   <div class="ag-actions">
+    <button class="ag-cancel" id="tgCancel">Abbrechen</button>
+    <button class="ag-submit ag-submit-tg" id="tgSubmit">✈️ Gruppe veröffentlichen</button>
    </div>
   </div>
  </div>
@@ -147,19 +294,19 @@
  </div>
  <!-- BURBUJA FLOTANTE -->
  <div id="chatPulseRing"></div>
- <button id="chatToggle" aria-label="Chat öffnen mit @Loresmitt">
-💁‍♀️
-<span id="notifBadge">1</span>
+ <button id="chatToggle" aria-label="Support-Chat öffnen">
+💬
+<span id="notifBadge" style="display:none">1</span>
 </button>
- <div id="chatWindow" role="dialog" aria-label="Chatten mit @Loresmitt">
+ <div id="chatWindow" role="dialog" aria-label="Chat mit LoveConnect Support">
   <div class="cw-topbar">
    <div class="cw-avatar-wrap">
-    <div class="cw-avatar">💁‍♀️</div>
-    <div class="cw-online"></div>
+    <div class="cw-avatar">🎧</div>
+    <div class="cw-online" id="cwOnlineDot"></div>
    </div>
    <div>
-    <div class="cw-name">@Loresmitt <span style="font-weight:400;font-size:12px;color:#b06af3;">( Telegram )</span></div>
-    <div class="cw-status">● jetzt online</div>
+    <div class="cw-name">LoveConnect Support</div>
+    <div class="cw-status" id="cwStatusText">● Team antwortet in Kürze</div>
    </div>
    <button id="closeChat" aria-label="Cerrar chat">✕</button>
   </div>
@@ -173,7 +320,7 @@ padding:10px 12px;
 display:flex; gap:8px; align-items:center;
 background:var(--dark3);
 ">
-   <input id="cwInput" type="text" placeholder="Nachricht schreiben..." maxlength="120" style="
+   <input id="cwInput" type="text" placeholder="Nachricht schreiben..." maxlength="500" style="
 flex:1; background:var(--dark); border:1px solid var(--border);
 border-radius:20px; padding:8px 14px;
 color:var(--text); font-family:'DM Sans',sans-serif; font-size:13px;
@@ -186,6 +333,34 @@ color:#000; font-size:16px; cursor:pointer;
 display:flex; align-items:center; justify-content:center;
 flex-shrink:0; transition:transform 0.15s;
 ">➤</button>
+  </div>
+ </div>
+
+ <!-- ADMIN PANEL (solo visible para la cuenta admin) -->
+ <button id="adminToggle" aria-label="Admin-Panel öffnen" style="display:none">
+  🛠 Admin
+  <span id="adminBadge" style="display:none">0</span>
+ </button>
+ <div id="adminPanel" role="dialog" aria-label="Admin Support Panel">
+  <div class="adm-topbar">
+   <div class="adm-title">🎧 Support-Panel</div>
+   <div style="display:flex;gap:8px;align-items:center;">
+    <button id="adminLogoutBtn" class="adm-logout-btn">Abmelden</button>
+    <button id="closeAdmin" class="adm-close">✕</button>
+   </div>
+  </div>
+  <div class="adm-body">
+   <div class="adm-list" id="adminConvList">
+    <div class="adm-empty">Noch keine Unterhaltungen.</div>
+   </div>
+   <div class="adm-chat">
+    <div class="adm-chat-header" id="adminChatHeader">Wähle eine Unterhaltung</div>
+    <div class="adm-messages" id="adminMessages"></div>
+    <div class="adm-input-area">
+     <input id="adminInput" type="text" placeholder="Antwort schreiben..." maxlength="500" disabled />
+     <button id="adminSend" disabled>➤</button>
+    </div>
+   </div>
   </div>
  </div>
 </body>
@@ -548,6 +723,94 @@ header {
 .t-dot:nth-child(3){animation-delay:0.4s;}
 @keyframes typing { 0%,60%,100%{transform:translateY(0);opacity:0.4;} 30%{transform:translateY(-5px);opacity:1;} }
 
+/* ── ADMIN PANEL ── */
+#adminToggle {
+  position:fixed; bottom:28px; left:28px;
+  padding:12px 18px; border-radius:30px;
+  background:linear-gradient(135deg,#1a1526,#2a2038);
+  border:1px solid var(--lavender); color:#fff;
+  font-family:'DM Mono'; font-size:13px; font-weight:600;
+  cursor:pointer; z-index:1000; display:flex; align-items:center; gap:8px;
+  box-shadow:0 4px 24px rgba(176,106,243,0.35);
+}
+#adminBadge {
+  background:linear-gradient(135deg,#f5c842,#ffd700);
+  color:#000; font-size:11px; font-weight:800;
+  width:20px; height:20px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+}
+#adminPanel {
+  position:fixed; inset:0; z-index:3000;
+  background:var(--dark);
+  display:none; flex-direction:column;
+}
+#adminPanel.open { display:flex; }
+.adm-topbar {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:16px 24px; border-bottom:1px solid var(--border);
+  background:var(--dark2);
+}
+.adm-title { font-family:'Playfair Display',serif; font-size:20px; font-weight:800; color:#fff; }
+.adm-logout-btn, .adm-close {
+  background:transparent; border:1px solid var(--border); color:var(--text);
+  border-radius:10px; padding:8px 14px; cursor:pointer; font-family:'DM Mono'; font-size:12px;
+  transition:all 0.2s;
+}
+.adm-logout-btn:hover, .adm-close:hover { border-color:var(--rose); color:var(--rose); }
+.adm-body { flex:1; display:flex; min-height:0; }
+.adm-list {
+  width:300px; flex-shrink:0; border-right:1px solid var(--border);
+  overflow-y:auto; background:var(--dark2);
+}
+.adm-empty { padding:24px; text-align:center; color:var(--muted); font-size:13px; }
+.adm-conv-item {
+  display:flex; align-items:center; gap:10px; padding:14px 16px;
+  border-bottom:1px solid var(--border); cursor:pointer; transition:background 0.15s;
+  position:relative;
+}
+.adm-conv-item:hover, .adm-conv-item.active { background:rgba(255,77,141,0.08); }
+.adm-conv-avatar {
+  width:38px; height:38px; border-radius:50%; flex-shrink:0;
+  background:linear-gradient(135deg,var(--rose),var(--lavender));
+  display:flex; align-items:center; justify-content:center; font-size:16px; color:#fff;
+}
+.adm-conv-info { flex:1; min-width:0; }
+.adm-conv-name { font-size:13px; font-weight:700; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.adm-conv-last { font-size:11px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px; }
+.adm-conv-unread {
+  background:var(--rose); color:#fff; font-size:10px; font-weight:800;
+  border-radius:50%; width:18px; height:18px; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+}
+.adm-chat { flex:1; display:flex; flex-direction:column; min-width:0; }
+.adm-chat-header {
+  padding:14px 20px; border-bottom:1px solid var(--border);
+  font-size:14px; font-weight:700; color:#fff;
+}
+.adm-messages { flex:1; overflow-y:auto; padding:20px; display:flex; flex-direction:column; gap:10px; }
+.adm-msg-row { display:flex; }
+.adm-msg-row.from-user { justify-content:flex-start; }
+.adm-msg-row.from-admin { justify-content:flex-end; }
+.adm-bubble {
+  max-width:60%; padding:10px 14px; border-radius:14px; font-size:13px; line-height:1.5;
+}
+.adm-msg-row.from-user .adm-bubble { background:var(--dark3); border:1px solid var(--border); color:var(--text); border-radius:4px 14px 14px 14px;}
+.adm-msg-row.from-admin .adm-bubble { background:linear-gradient(135deg,var(--rose),var(--lavender)); color:#fff; border-radius:14px 4px 14px 14px;}
+.adm-input-area { display:flex; gap:10px; padding:14px 20px; border-top:1px solid var(--border); background:var(--dark2); }
+.adm-input-area input {
+  flex:1; background:var(--dark); border:1px solid var(--border); border-radius:20px;
+  padding:10px 16px; color:var(--text); font-size:13px; outline:none;
+}
+.adm-input-area button {
+  width:40px; height:40px; border-radius:50%; border:none;
+  background:linear-gradient(135deg,var(--rose),var(--lavender)); color:#fff; font-size:16px; cursor:pointer;
+}
+.adm-input-area input:disabled, .adm-input-area button:disabled { opacity:0.4; cursor:not-allowed; }
+@media(max-width:700px){
+  .adm-list { width:120px; }
+  .adm-conv-name, .adm-conv-last { display:none; }
+}
+
 footer {
   border-top:1px solid var(--border); padding:28px 0;
   text-align:center; font-family:'DM Mono'; font-size:12px;
@@ -760,6 +1023,41 @@ footer span { color:var(--rose); }
 .ag-submit:active { transform:translateY(0); }
 .ag-submit:disabled { opacity:0.5; cursor:not-allowed; transform:none; }
 
+/* Category pill buttons */
+.ag-cat-row { display:flex; gap:8px; flex-wrap:wrap; }
+.ag-cat-btn {
+  padding:8px 16px; border-radius:20px; border:1px solid var(--border);
+  background:transparent; color:var(--muted);
+  font-family:'DM Mono'; font-size:11px; letter-spacing:0.4px;
+  cursor:pointer; transition:all 0.18s;
+}
+.ag-cat-btn:hover { border-color:rgba(255,77,141,0.4); color:var(--text); }
+.ag-cat-btn.active {
+  border-color:var(--rose); color:var(--rose);
+  background:rgba(255,77,141,0.09);
+}
+.ag-cat-btn[data-cat="Freunde"].active {
+  border-color:#b06af3; color:#b06af3;
+  background:rgba(176,106,243,0.09);
+}
+
+/* Link hint */
+.ag-link-hint {
+  font-family:'DM Mono'; font-size:10px; color:var(--muted);
+  margin-top:5px; letter-spacing:0.3px;
+}
+
+/* WA / TG submit button colors */
+.ag-submit-wa {
+  background:linear-gradient(135deg,#25d366,#128c3e);
+  box-shadow:0 4px 20px rgba(37,211,102,0.3);
+}
+.ag-submit-tg {
+  background:linear-gradient(135deg,#26a0da,#0088cc);
+  box-shadow:0 4px 20px rgba(38,160,218,0.3);
+}
+
+
 /* Toast */
 .ag-toast {
   position:fixed; bottom:32px; left:50%; transform:translateX(-50%) translateY(80px);
@@ -959,18 +1257,209 @@ footer span { color:var(--rose); }
   transform: translateY(-2px);
 }
 
+/* ── AUTH HEADER BUTTON ── */
+.auth-header-btn {
+  font-family:'DM Mono'; font-size:11px; padding:7px 16px;
+  border-radius:20px; letter-spacing:0.5px;
+  border:1px solid var(--border); background:transparent;
+  color:#c8b8d8; cursor:pointer; white-space:nowrap;
+  transition:all 0.2s; flex-shrink:0;
+}
+.auth-header-btn:hover, .auth-header-btn.logged-in {
+  color:var(--rose); border-color:var(--rose);
+  background:rgba(255,77,141,0.07);
+}
+
+/* ── QUICK ADD CARDS ── */
+.quick-add-row {
+  display:grid; grid-template-columns:1fr 1fr;
+  gap:14px; margin:28px 0 0;
+}
+.quick-add-card {
+  display:flex; align-items:center; gap:14px;
+  border-radius:14px; padding:16px 18px;
+  border:1px solid; transition:transform 0.2s, box-shadow 0.2s;
+  position:relative; overflow:hidden;
+}
+.quick-add-card:hover { transform:translateY(-2px); }
+.quick-add-wa {
+  background:rgba(37,211,102,0.06);
+  border-color:rgba(37,211,102,0.25);
+  box-shadow:0 0 18px rgba(37,211,102,0.06);
+}
+.quick-add-tg {
+  background:rgba(38,160,218,0.06);
+  border-color:rgba(38,160,218,0.25);
+  box-shadow:0 0 18px rgba(38,160,218,0.06);
+}
+.qa-icon { font-size:26px; flex-shrink:0; }
+.qa-info { flex:1; min-width:0; }
+.qa-title {
+  font-family:'Inter',sans-serif; font-size:13px; font-weight:800;
+  color:#fff; margin-bottom:3px; white-space:nowrap; overflow:hidden;
+  text-overflow:ellipsis;
+}
+.qa-sub { font-size:11px; color:var(--muted); line-height:1.4; }
+.qa-btn {
+  font-family:'DM Mono'; font-size:11px; padding:7px 14px;
+  border-radius:20px; cursor:pointer; font-weight:600;
+  letter-spacing:0.4px; white-space:nowrap; flex-shrink:0;
+  transition:all 0.2s; border:1px solid;
+}
+.qa-btn-wa { color:#25d366; border-color:rgba(37,211,102,0.4); background:transparent; }
+.qa-btn-wa:hover { background:#25d366; color:#000; border-color:#25d366; }
+.qa-btn-tg { color:#26a0da; border-color:rgba(38,160,218,0.4); background:transparent; }
+.qa-btn-tg:hover { background:#26a0da; color:#fff; border-color:#26a0da; }
+@media(max-width:600px){
+  .quick-add-row { grid-template-columns:1fr; }
+  .qa-title { font-size:12px; }
+}
+
+/* ── AUTH & PROFILE MODALS ── */
+.auth-overlay {
+  position:fixed; inset:0;
+  background:rgba(12,9,16,0.88);
+  backdrop-filter:blur(10px);
+  z-index:2500;
+  display:flex; align-items:center; justify-content:center;
+  padding:20px;
+  opacity:0; pointer-events:none;
+  transition:opacity 0.25s ease;
+}
+.auth-overlay.open { opacity:1; pointer-events:all; }
+.auth-modal {
+  background:var(--dark2);
+  border:1px solid rgba(255,77,141,0.22);
+  border-radius:20px;
+  width:100%; max-width:400px;
+  padding:28px 28px 24px;
+  box-shadow:0 20px 80px rgba(0,0,0,0.7), 0 0 50px rgba(255,77,141,0.07);
+  position:relative;
+  animation:modalPop 0.3s cubic-bezier(0.34,1.56,0.64,1) both;
+}
+@keyframes modalPop { from{transform:translateY(24px) scale(0.95);opacity:0;} to{transform:none;opacity:1;} }
+.auth-close { position:absolute; top:16px; right:16px; }
+.auth-tabs {
+  display:flex; gap:0; margin-bottom:22px;
+  border-bottom:1px solid var(--border);
+}
+.auth-tab {
+  flex:1; padding:10px; border:none; background:transparent;
+  color:var(--muted); font-family:'DM Mono'; font-size:12px;
+  letter-spacing:0.5px; cursor:pointer; transition:all 0.2s;
+  border-bottom:2px solid transparent; margin-bottom:-1px;
+}
+.auth-tab.active { color:var(--rose); border-bottom-color:var(--rose); }
+.auth-header-logo {
+  font-family:'Playfair Display',serif; font-size:20px; font-weight:900;
+  background:linear-gradient(135deg,var(--rose),var(--lavender));
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+  text-align:center; margin-bottom:6px;
+}
+.auth-sub { font-size:13px; color:var(--muted); text-align:center; margin-bottom:20px; }
+.auth-error {
+  font-family:'DM Mono'; font-size:11px; color:#ff6b6b;
+  min-height:14px; margin-bottom:6px; letter-spacing:0.3px;
+}
+.auth-divider {
+  display:flex; align-items:center; gap:10px;
+  margin:16px 0 14px; color:var(--muted);
+  font-family:'DM Mono'; font-size:10px; letter-spacing:1px;
+  text-transform:uppercase;
+}
+.auth-divider::before, .auth-divider::after {
+  content:''; flex:1; height:1px; background:var(--border);
+}
+.google-btn {
+  width:100%; display:flex; align-items:center; justify-content:center;
+  gap:10px; padding:10px 14px; border-radius:12px;
+  background:#fff; border:1px solid rgba(0,0,0,0.08);
+  color:#3c4043; font-family:'DM Sans',sans-serif; font-size:13px;
+  font-weight:500; cursor:pointer; transition:all 0.2s;
+}
+.google-btn:hover { box-shadow:0 2px 14px rgba(255,255,255,0.15); transform:translateY(-1px); }
+.google-btn:disabled { opacity:0.6; cursor:not-allowed; }
+
+/* Profile modal — admin/professional dashboard look */
+.profile-modal { max-width:460px; padding:0; overflow:hidden; }
+.profile-banner {
+  background:linear-gradient(135deg, rgba(255,77,141,0.16), rgba(176,106,243,0.16));
+  border-bottom:1px solid var(--border);
+  padding:30px 28px 22px; text-align:center; position:relative;
+}
+.profile-body { padding:22px 28px 26px; }
+.profile-avatar {
+  width:72px; height:72px; border-radius:50%;
+  background:linear-gradient(135deg,var(--rose),var(--lavender));
+  border:3px solid rgba(255,255,255,0.15);
+  display:flex; align-items:center; justify-content:center;
+  font-size:32px; margin:0 auto 12px;
+  box-shadow:0 6px 24px rgba(255,77,141,0.3);
+}
+.profile-username {
+  font-family:'Playfair Display',serif; font-size:21px; font-weight:900;
+  color:#fff; text-align:center; margin-bottom:4px;
+}
+.profile-email {
+  font-family:'DM Mono'; font-size:11px; color:var(--muted);
+  text-align:center; margin-bottom:0; letter-spacing:0.5px;
+}
+.profile-stats-row {
+  display:flex; justify-content:center; gap:28px;
+  margin-top:18px; padding-top:16px; border-top:1px solid var(--border);
+}
+.profile-stat { text-align:center; }
+.profile-stat-num { font-family:'Playfair Display',serif; font-size:20px; font-weight:800; color:var(--rose); }
+.profile-stat-label { font-family:'DM Mono'; font-size:9px; color:var(--muted); letter-spacing:1px; text-transform:uppercase; margin-top:2px; }
+.profile-section-title {
+  font-family:'DM Mono'; font-size:10px; color:var(--lavender);
+  letter-spacing:3px; text-transform:uppercase; margin-bottom:14px;
+  display:flex; align-items:center; gap:8px;
+}
+.profile-groups { display:flex; flex-direction:column; gap:10px; max-height:220px; overflow-y:auto; }
+.profile-groups::-webkit-scrollbar{width:3px;}
+.profile-groups::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+.profile-empty { font-size:13px; color:var(--muted); text-align:center; padding:16px 0; }
+.profile-group-item {
+  display:flex; align-items:center; gap:10px;
+  background:var(--dark3); border:1px solid var(--border);
+  border-radius:12px; padding:10px 12px;
+  transition:border-color 0.2s;
+}
+.profile-group-item:hover { border-color:rgba(255,77,141,0.3); }
+.pgi-icon { font-size:20px; flex-shrink:0; }
+.pgi-info { flex:1; min-width:0; }
+.pgi-name { font-size:13px; font-weight:700; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.pgi-plat { font-size:10px; color:var(--muted); font-family:'DM Mono'; margin-top:2px; }
+.pgi-link {
+  font-size:11px; padding:4px 10px; border-radius:12px;
+  text-decoration:none; font-family:'DM Mono'; flex-shrink:0;
+  border:1px solid; transition:all 0.2s;
+}
+.pgi-link.wa { color:#25d366; border-color:rgba(37,211,102,0.3); }
+.pgi-link.wa:hover { background:#25d366; color:#000; }
+.pgi-link.tg { color:#26a0da; border-color:rgba(38,160,218,0.3); }
+.pgi-link.tg:hover { background:#26a0da; color:#fff; }
+
+.pgi-delete {
+  width:30px; height:30px; border-radius:8px; flex-shrink:0;
+  border:1px solid rgba(255,77,141,0.25); background:transparent;
+  color:var(--muted); font-size:14px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  transition:all 0.18s;
+}
+.pgi-delete:hover {
+  border-color:rgba(255,77,141,0.6); background:rgba(255,77,141,0.1);
+  color:var(--rose);
+}
+
 </style><script>/* ── DATA ── */
 const allGroups = [
   { icon:'🇩🇪', name:'Nudes nudes free 🔥18+', desc:'Die größte deutschsprachige Dating-Gruppe. Menschen aus ganz Europa suchen nach kostenlosem Chat und Sex.', plat:'wa', cat:'Dating', members:'4,200', badge:'⭐ TOP', link:'https://chat.whatsapp.com/LPbHTT42YCdHEPQ1kjhFC9?mode=gi_t' },
   { icon:'🇩🇪', name:'Hetero🔥🔥', desc:'Looking for fun? 🇩🇪🇦🇹🇨🇭 Finde Singles in deiner Nähe. Komplett kostenloser Chat und diskrete Treffen.', plat:'wa', cat:'Freunde', members:'6,750', badge:'⭐ TOP', link:'https://chat.whatsapp.com/Hgr5NN93lEMFhdbxlH7vXy?s=cl&p=a&ilr=1' },
-  { icon:'🇩🇪', name:'geile Frauen Sexcam 🇩🇪🔥', desc:'Keine Verpflichtungen, nur Spaß. 💘 Trete der größten Dating-Community in Europa bei. Kostenlos chatten y abgelenkt werden.', plat:'wa', cat:'Dating', members:'1,980', badge:'🔥 HOT', link:'https://chat.whatsapp.com/HZLYMEJ2XF2HYNVY18BX8T' },
   { icon:'🇩🇪', name:'GRUPPE PREMIUM VIP 🇩🇪🔥', desc:'Bist du bereit? 🔞 Die heißeste deutschsprachige Gruppe ist online. Chatten, flirten, treffen – alles kostenlos.', plat:'wa', cat:'Dating', members:'3,100', badge:'🔥 HOT', link:'https://chat.whatsapp.com/GClpgEH7Nm0Dw9R0iFt1yz' },
-  { icon:'🇩🇪', name:'geile Nachrichten 📩🔥🇩🇪', desc:'🔥 Suchen, chatten, treffen. Ganz Europa in einer Gruppe. Kostenloser Chat & unverbindlicher Sex.', plat:'wa', cat:'Freunde', members:'8,400', badge:'🔥 HOT', link:'https://chat.whatsapp.com/H7N7Dgamrdp3stttwCZaUs' },
   { icon:'🇩🇪', name:'Bilder geeil🔥', desc:'Deine Stadt, deine Regeln. 📍 Finde Singles aus dem deutschsprachigen Raum für schnelle, kostenlose Chats und diskreten Spaß.', plat:'wa', cat:'Dating', members:'2,340', badge:'✨ NEW', link:'https://chat.whatsapp.com/CBcZiLQl2uK2UnYiJMPIk3?s=cl&p=a&ilr=1' },
-  { icon:'🇩🇪', name:'sexual experience 🫦', desc:'Pssst... Hast du das schon gesehen? 🤫 Die größte Dating-Gruppe für Singles aus ganz Europa ist jetzt offen. Kostenloser Chat & unkomplizierter Spaß.', plat:'wa', cat:'Dating', members:'5,600', badge:'🔥 HOT', link:'https://chat.whatsapp.com/GvF5rVvx5e5KBPDLGPZ6tK' },
-  { icon:'🇩🇪', name:'Bilder und videos 🔞', desc:'geheimtipp für singles! 🗺️ tausende menschen aus ganz europa suchen genau das gleiche wie du: Kostenloser Chat und leidenschaftliche Treffen.', plat:'wa', cat:'Freunde', members:'9,100', badge:'⭐ TOP', link:'https://chat.whatsapp.com/CaacQfFclAyGqAoBLfSr5Y' },
   { icon:'🇩🇪', name:'Deutschland🇩🇪🔥', desc:'Nur für Erwachsene. 🔞 Zutritt zur größten deutschsprachigen Community. Keine Fake-Profile, nur echte Chats und Treffen.', plat:'wa', cat:'Freunde', members:'2,800', badge:'🔥 HOT', link:'https://chat.whatsapp.com/Cdwr7GBqUhg3lWrxq1rTuH?mode=gi_t' },
-  { icon:'🇩🇪', name:'Sexualpartner 🔥', desc:'Warum alleine bleiben? 😏 Entdecke die aktivste Dating-Gruppe in Europa. Kostenlos anmelden, direkt chatten und Spaß haben.', plat:'wa', cat:'Freunde', members:'4,500', badge:'✨ NEW', link:'https://chat.whatsapp.com/LjQUBTojUpq0RozFfBuuy1' },
   { icon:'🇩🇪', name:'Nudes , bilder videos kostenlos🔥🔥', desc:'Die Gruppe ist heiß gelaufen! 🔥 Singles aus Deutschland, Österreich und der Schweiz suchen kostenlose Chats und mehr. ', plat:'wa', cat:'Freunde', members:'3,300', badge:'🔥 HOT', link:'https://chat.whatsapp.com/FSH7mbLbMia8WWI6LNny2m' },
   { icon:'🇩🇪', name:'🔥Geile reife Frauen🔥 +45', desc:'Suchst du ein Abenteuer? 🌍 Menschen aus ganz Europa treffen sich hier. Kostenloser Chat, diskret und direkt. ', plat:'tg', cat:'Dating', members:'7,200', badge:'🔥 HOT', link:'https://t.me/nurreif40' },
   { icon:'🇩🇪', name:'BOT INSTAGRAM 1000 Follower 🔥🇩🇪', desc:'🔥 Größte Dating-Gruppe Europas! Kostenloser Chat & Sex.', plat:'wa', cat:'Freunde', members:'1,650', badge:'⭐ TOP', link:'https://chat.whatsapp.com/EMbf4x54SI9FZkcVlkikzl?mode=gi_t' },
@@ -979,7 +1468,6 @@ const allGroups = [
   { icon:'🇩🇪', name:'SNAPCHATS🇩🇪🇦🇹🇨🇭🔥', desc:'💬 Chatten, flirten, Spaß haben. Ganz Europa in einer App.', plat:'wa', cat:'Freunde', members:'3,750', badge:'🔥 HOT', link:'https://chat.whatsapp.com/CSNc9dfNeYX6x6BJzPjfzK' },
   { icon:'🇩🇪', name:'NUR TELEGRAM🇩🇪💦', desc:'🔥 Lust auf ein Abenteuer? Tritt der größten Dating-Gruppe bei.', plat:'wa', cat:'Freunde', members:'2,200', badge:'🔥 HOT', link:'https://chat.whatsapp.com/HbwedM5jKwpKbedtGj4Zc9' },
   { icon:'🇩🇪', name:'NUDES NUDES FREEE🔥🔥🇩🇪', desc:'⚡ Chat & Sex – 100% Kostenlos. Entdecke Singles aus ganz Europa im größten deutschsprachigen Netzwerk.', plat:'wa', cat:'Dating', members:'5,400', badge:'🔥 HOT', link:'https://chat.whatsapp.com/HG141FVRjvZ0YFA2D5SprC?mode=gi_t' },
-
   { icon:'🇦🇹', name:'NUDES/DE🇩🇪🇦🇹🇨🇭🔥', desc:'Finde deinen Match in Wien! Aktive Community für Singles aus Österreich. Kostenlos & diskret.', plat:'wa', cat:'Dating', members:'3,800', badge:'🔥 HOT', link:'https://chat.whatsapp.com/CllOfO20Fv8D3GmhPJCgH6' },
   { icon:'🇨🇭', name:'ONLYGIRLS🇩🇪🇦🇹🇨🇭🔥💦', desc:'Die aktivste Dating-Gruppe der Schweiz. Echte Menschen, echte Treffen. Jetzt beitreten!', plat:'wa', cat:'Freunde', members:'5,200', badge:'⭐ TOP', link:'https://chat.whatsapp.com/DN3nEiPy93FKlevMjGRKpR' },
   { icon:'🇩🇪', name:'Hot Mania 2026🔥', desc:'Berlin trifft sich hier! 💘 Tausende Singles aus der Hauptstadt suchen Dates und Freundschaften.', plat:'tg', cat:'Dating', members:'7,600', badge:'⭐ TOP', link:'https://t.me/+Sub6WgnEpG04ZDYx' },
@@ -1022,26 +1510,41 @@ function renderGroups() {
   page.forEach(g => {
     const isTg = g.plat === 'tg';
     const card = document.createElement('div');
-    card.className = 'group-card' + (g.plat === 'wa' ? ' card-wa' : g.plat === 'tg' ? ' card-tg' : '');
+    card.className = 'group-card' + (isTg ? ' card-tg' : ' card-wa');
+
+    // Badge HTML
+    let badgeHTML = '';
+    if (g.badge) {
+      let cls = 'special-badge';
+      if (g.badge.includes('HOT')) cls += ' badge-hot';
+      else if (g.badge.includes('TOP')) cls += ' badge-top';
+      else if (g.badge.includes('NEW')) cls += ' badge-new';
+      const parts = g.badge.split(' ');
+      const icon  = parts[0];
+      const label = parts.slice(1).join(' ');
+      badgeHTML = `<div class="${cls}"><span class="badge-icon">${icon}</span>${label ? ' '+label : ''}</div>`;
+    }
+
+    // Members display: show value if it has digits, else show platform active label
+    const membersVal = g.members && /\d/.test(g.members)
+      ? g.members
+      : (isTg ? '✈️ Aktiv' : '💬 Aktiv');
+
+    // Icon: if it's a platform emoji (💬 or ✈️) added by user, use flag/category emoji instead
+    const displayIcon = (g.icon === '💬' || g.icon === '✈️')
+      ? (g.cat === 'Dating' ? '💘' : '🤝')
+      : g.icon;
+
     card.innerHTML = `
-      ${g.badge ? (() => {
-        let cls = 'special-badge';
-        if (g.badge.includes('HOT')) cls += ' badge-hot';
-        else if (g.badge.includes('TOP')) cls += ' badge-top';
-        else if (g.badge.includes('NEW')) cls += ' badge-new';
-        const parts = g.badge.split(' ');
-        const icon = parts[0];
-        const label = parts.slice(1).join(' ');
-        return `<div class="${cls}"><span class="badge-icon">${icon}</span>${label ? ' '+label : ''}</div>`;
-      })() : ''}
+      ${badgeHTML}
       <div class="card-top">
-        <div class="card-icon">${g.icon}</div>
+        <div class="card-icon">${displayIcon}</div>
         <span class="plat-badge ${isTg ? 'badge-tg' : 'badge-wa'}">${isTg ? 'Telegram' : 'WhatsApp'}</span>
       </div>
       <div class="card-name">${g.name}</div>
       <div class="card-desc">${g.desc}</div>
       <div class="card-footer">
-        <div class="members">Members: <span>${g.members}</span></div>
+        <div class="members">Mitglieder: <span>${membersVal}</span></div>
         <a href="${g.link}" target="_blank" rel="noopener" class="join-btn ${isTg ? 'tg' : ''}">Eingeben →</a>
       </div>`;
     grid.appendChild(card);
@@ -1118,7 +1621,7 @@ document.querySelectorAll('.filter-btn[data-f]').forEach(b => {
 
 renderGroups();
 
-/* ── CHATBOT ── */
+/* ── CHAT REAL (usuario ↔ soporte/admin) vía Firestore ── */
 const toggle   = document.getElementById('chatToggle');
 const win      = document.getElementById('chatWindow');
 const closeBtn = document.getElementById('closeChat');
@@ -1128,51 +1631,133 @@ const cwInput  = document.getElementById('cwInput');
 const cwSend   = document.getElementById('cwSend');
 
 let opened = false, chatStarted = false;
-let botMsgCount = 0;   // cuántos mensajes ha enviado Sofía
-let waitingBot  = false;
-let userName    = '';  // nombre del usuario
+let chatId = null;          // id de la conversación (uid o invitado)
+let unsubMessages = null;   // listener activo de mensajes
+let unsubChatDoc   = null;  // listener del doc de la conversación (para badge)
 
-/* Detecta si el mensaje contiene un nombre */
-function extractName(text) {
-  const t = text.trim();
-  const patterns = [
-    /ich\s+bin\s+([A-ZÀ-Ža-zà-ž]+)/i,
-    /mein\s+name\s+ist\s+([A-ZÀ-Ža-zà-ž]+)/i,
-    /me\s+llamo\s+([A-ZÀ-Ža-zà-ž]+)/i,
-    /soy\s+([A-ZÀ-Ža-zà-ž]+)/i,
-    /i['\u2019]?m\s+([A-ZÀ-Ža-zà-ž]+)/i,
-    /i\s+am\s+([A-ZÀ-Ža-zà-ž]+)/i,
-    /bin\s+([A-ZÀ-Ža-zà-ž]+)/i,
-    /mein\s+name\s*[:\-]\s*([A-ZÀ-Ža-zà-ž]+)/i,
-    /^([A-ZÀ-Ža-zà-ž]{2,})[\s!.,]*$/,
-  ];
-  for (const re of patterns) {
-    const m = t.match(re);
-    if (m && m[1] && m[1].length >= 2) {
-      return m[1].charAt(0).toUpperCase() + m[1].slice(1).toLowerCase();
-    }
-  }
-  return '';
+function waitForFirebaseChat(cb, tries = 0) {
+  if (window._fb) { cb(); }
+  else if (tries < 50) { setTimeout(() => waitForFirebaseChat(cb, tries + 1), 100); }
 }
 
-/* Respuestas de Sofía según turno */
-const sofiaFlow = [
-  // Turno 1 — saludo automático al abrir
-  { text: "Heyy! 💕 Ich bin @Loresmitt — schön, dass du hier bist! Sag mir: Suchst du neue Freunde, jemanden zum Daten oder vielleicht etwas Ernstes? 😊" },
-  // Turno 2 — responde al primer mensaje del usuario
-  { text: "Oh, wie schön! 🌹 Dann bist du hier genau richtig. Wir haben aktive Gruppen auf WhatsApp und Telegram — über 85.000 Menschen haben hier bereits ihre Verbindung gefunden. Wie heißt du? Damit ich dich der Community vorstellen kann 😊" },
-  // Turno 3 — responde al segundo mensaje, usa nombre solo si fue detectado
-  {
-    getText: () => userName
-      ? `Perfekt, ${userName}! 😍 Schön, dich kennenzulernen 💕 Schreib mir direkt auf Telegram — dort können wir uns in Ruhe unterhalten.`
-      : `Perfekt! 😍 Schreib mir direkt auf Telegram — dort können wir uns in Ruhe unterhalten.`,
-    link: { href: "https://t.me/Loresmitt", text: "Hier chat →" },
-    link2: { href: "https://t.me/Loresmitt", text: "Hier chat →" }
-
+/* Identidad: usa el uid de Firebase si hay sesión, si no un id de invitado persistente */
+function getGuestId() {
+  let gid = localStorage.getItem('lc_guest_id');
+  if (!gid) {
+    gid = 'guest_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+    localStorage.setItem('lc_guest_id', gid);
   }
-];
+  return gid;
+}
 
+function currentChatId() {
+  const fb = window._fb;
+  const user = fb && fb.auth.currentUser;
+  return user ? user.uid : getGuestId();
+}
 
+function currentChatName() {
+  const fb = window._fb;
+  const user = fb && fb.auth.currentUser;
+  if (user) return user.displayName || (user.email ? user.email.split('@')[0] : 'Benutzer');
+  return 'Gast ' + getGuestId().slice(-4);
+}
+
+function currentChatEmail() {
+  const fb = window._fb;
+  const user = fb && fb.auth.currentUser;
+  return user ? user.email : '';
+}
+
+/* Asegura que el documento de chat exista, y lo crea/actualiza con datos del usuario */
+async function ensureChatDoc(id) {
+  const fb = window._fb;
+  try {
+    await fb.setDoc(fb.doc(fb.db, 'chats', id), {
+      name: currentChatName(),
+      email: currentChatEmail(),
+      lastMessage: '',
+      lastAt: fb.serverTimestamp(),
+      unreadAdmin: 0,
+      unreadUser: 0
+    }, { merge: true });
+  } catch(e) { console.error('ensureChatDoc error:', e); }
+}
+
+function fmtTime(ts) {
+  try {
+    const d = ts && ts.toDate ? ts.toDate() : new Date();
+    return d.toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' });
+  } catch(e) { return ''; }
+}
+
+function renderUserMessages(docs) {
+  const wasNearBottom = msgs.scrollTop + msgs.clientHeight >= msgs.scrollHeight - 40;
+  msgs.innerHTML = '';
+  if (docs.length === 0) {
+    msgs.innerHTML = `<div style="text-align:center;color:var(--muted);font-size:12px;padding:12px 0;">
+      ✨ Schreib uns – unser Support antwortet so schnell wie möglich!</div>`;
+  }
+  docs.forEach(m => {
+    const row = document.createElement('div');
+    if (m.sender === 'admin') {
+      row.className = 'cw-msg';
+      row.innerHTML = `<div class="cw-m-avatar">🎧</div>
+        <div class="cw-bubble">${escapeHtml(m.text)}</div>`;
+    } else {
+      row.style.cssText = 'display:flex; justify-content:flex-end; animation:fadeUp 0.3s ease;';
+      row.innerHTML = `<div style="
+        max-width:80%; padding:9px 13px;
+        background:linear-gradient(135deg,rgba(255,77,141,0.18),rgba(176,106,243,0.18));
+        border:1px solid rgba(255,77,141,0.35);
+        border-radius:14px 4px 14px 14px;
+        font-size:13px; line-height:1.5; color:var(--text);
+      ">${escapeHtml(m.text)}</div>`;
+    }
+    msgs.appendChild(row);
+  });
+  if (wasNearBottom || docs.length <= 1) msgs.scrollTop = msgs.scrollHeight;
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+/* Suscribe a los mensajes de la conversación actual */
+function subscribeToChat(id) {
+  const fb = window._fb;
+  if (unsubMessages) { unsubMessages(); unsubMessages = null; }
+  if (unsubChatDoc) { unsubChatDoc(); unsubChatDoc = null; }
+
+  const q = fb.query(fb.collection(fb.db, 'chats', id, 'messages'), fb.orderBy('createdAt', 'asc'));
+  unsubMessages = fb.onSnapshot(q, snap => {
+    const docs = [];
+    snap.forEach(d => docs.push(d.data()));
+    renderUserMessages(docs);
+  }, err => console.error('chat messages listener error:', err));
+
+  /* Escucha el doc de chat para mostrar notificación cuando responde soporte */
+  unsubChatDoc = fb.onSnapshot(fb.doc(fb.db, 'chats', id), snap => {
+    const data = snap.data();
+    if (!data) return;
+    if (data.unreadUser > 0 && !opened) {
+      badge.style.display = 'flex';
+      badge.textContent = data.unreadUser;
+    } else if (opened) {
+      badge.style.display = 'none';
+      /* marcar como leído si el chat está abierto */
+      fb.updateDoc(fb.doc(fb.db, 'chats', id), { unreadUser: 0 }).catch(()=>{});
+    }
+  }, err => console.error('chat doc listener error:', err));
+}
+
+async function initChat() {
+  chatId = currentChatId();
+  await ensureChatDoc(chatId);
+  subscribeToChat(chatId);
+}
 
 /* ── Toggle abrir/cerrar ── */
 toggle.addEventListener('click', () => {
@@ -1180,112 +1765,43 @@ toggle.addEventListener('click', () => {
   win.classList.toggle('open', opened);
   if (opened) {
     badge.style.display = 'none';
-    toggle.innerHTML = '✕';
-    toggle.style.fontSize = '20px';
-    if (!chatStarted) { chatStarted = true; sendBotMsg(0); }
+    toggle.innerHTML = '✕<span id="notifBadge" style="display:none">1</span>';
+    if (chatId) {
+      const fb = window._fb;
+      fb.updateDoc(fb.doc(fb.db, 'chats', chatId), { unreadUser: 0 }).catch(()=>{});
+    }
     setTimeout(() => cwInput.focus(), 400);
   } else {
-    toggle.innerHTML = '💁‍♀️<span id="notifBadge" style="display:none">1</span>';
-    toggle.style.fontSize = '26px';
+    toggle.innerHTML = '💬<span id="notifBadge" style="display:none">1</span>';
   }
 });
 
 closeBtn.addEventListener('click', () => {
   opened = false;
   win.classList.remove('open');
-  toggle.innerHTML = '💁‍♀️<span id="notifBadge" style="display:none">1</span>';
-  toggle.style.fontSize = '26px';
+  toggle.innerHTML = '💬<span id="notifBadge" style="display:none">1</span>';
 });
 
-/* ── Helpers ── */
-function addTyping() {
-  const row = document.createElement('div');
-  row.className = 'typing-wrap'; row.id = 'typing';
-  row.innerHTML = `<div class="cw-m-avatar">💁‍♀️</div>
-    <div class="typing-box">
-      <div class="t-dot"></div><div class="t-dot"></div><div class="t-dot"></div>
-    </div>`;
-  msgs.appendChild(row);
-  msgs.scrollTop = msgs.scrollHeight;
-}
-function removeTyping() { const t = document.getElementById('typing'); if (t) t.remove(); }
-
-function appendUserMsg(text) {
-  const row = document.createElement('div');
-  row.style.cssText = 'display:flex; justify-content:flex-end; animation:fadeUp 0.3s ease;';
-  row.innerHTML = `<div style="
-    max-width:80%; padding:9px 13px;
-    background:linear-gradient(135deg,rgba(255,77,141,0.18),rgba(176,106,243,0.18));
-    border:1px solid rgba(255,77,141,0.35);
-    border-radius:14px 4px 14px 14px;
-    font-size:13px; line-height:1.5; color:var(--text);
-  ">${text}</div>`;
-  msgs.appendChild(row);
-  msgs.scrollTop = msgs.scrollHeight;
-}
-
-function sendBotMsg(idx) {
-  if (idx >= sofiaFlow.length) return;
-  waitingBot = true;
-  setInputEnabled(false);
-  addTyping();
-  const delay = idx === 0 ? 0 : 6000;
-  setTimeout(() => {
-    removeTyping();
-    const item = sofiaFlow[idx];
-    const row = document.createElement('div');
-    row.className = 'cw-msg';
-    const msgText = item.getText ? item.getText() : item.text;
-    const linkHTML = item.link
-      ? `<br><a href="${item.link.href}" target="_blank" rel="noopener" class="cw-link">💗 ${item.link.text}</a>`
-        + (item.link2 ? `<br><a href="${item.link2.href}" target="_blank" rel="noopener" class="cw-link" style="margin-top:6px;">💗 ${item.link2.text}</a>` : '')
-      : '';
-    row.innerHTML = `<div class="cw-m-avatar">💁‍♀️</div>
-      <div class="cw-bubble">${msgText}${linkHTML}</div>`;
-    msgs.appendChild(row);
-    msgs.scrollTop = msgs.scrollHeight;
-    botMsgCount = idx + 1;
-    waitingBot = false;
-    /* Deshabilitar input después del 3er mensaje de Sofía */
-    if (botMsgCount >= sofiaFlow.length) {
-      setInputEnabled(false, true);
-    } else {
-      setInputEnabled(true);
-      cwInput.focus();
-    }
-  }, delay);
-}
-
-function setInputEnabled(on, finished = false) {
-  const area = document.getElementById('cwInputArea');
-  if (finished) {
-    area.innerHTML = `<p style="
-      width:100%; text-align:center; font-size:12px;
-      color:var(--muted); font-family:'DM Mono'; padding:4px 0;
-      letter-spacing:0.5px;
-    ">✨ Tritt bei und finde dein Match!</p>`;
-    return;
-  }
-  cwInput.disabled = !on;
-  cwSend.disabled  = !on;
-  cwInput.style.opacity = on ? '1' : '0.45';
-  cwSend.style.opacity  = on ? '1' : '0.45';
-}
-
 /* ── Enviar mensaje del usuario ── */
-function handleUserSend() {
+async function handleUserSend() {
   const text = cwInput.value.trim();
-  if (!text || waitingBot || botMsgCount >= sofiaFlow.length) return;
-  /* Solo acepta 2 mensajes del usuario (responde en turnos 1 y 2) */
-  const userTurn = botMsgCount; // 1 = tras saludo, 2 = tras segunda respuesta
-  if (userTurn < 1 || userTurn > 2) return;
-  /* Si es el turno del nombre (botMsgCount === 2), intentar extraerlo */
-  if (userTurn === 2) {
-    userName = extractName(text); // solo se guarda si se detecta un nombre real
-  }
-  appendUserMsg(text);
+  if (!text || !chatId) return;
   cwInput.value = '';
-  sendBotMsg(userTurn);   // botMsgCount = índice del siguiente mensaje de Sofía
+  const fb = window._fb;
+  try {
+    await fb.addDoc(fb.collection(fb.db, 'chats', chatId, 'messages'), {
+      sender: 'user',
+      text,
+      createdAt: fb.serverTimestamp()
+    });
+    await fb.setDoc(fb.doc(fb.db, 'chats', chatId), {
+      name: currentChatName(),
+      email: currentChatEmail(),
+      lastMessage: text,
+      lastAt: fb.serverTimestamp(),
+      unreadAdmin: fb.increment(1)
+    }, { merge: true });
+  } catch(e) { console.error('send message error:', e); }
 }
 
 cwSend.addEventListener('click', handleUserSend);
@@ -1293,7 +1809,8 @@ cwInput.addEventListener('keydown', e => { if (e.key === 'Enter') handleUserSend
 cwSend.addEventListener('mouseenter', () => { cwSend.style.transform = 'scale(1.1)'; });
 cwSend.addEventListener('mouseleave', () => { cwSend.style.transform = 'scale(1)'; });
 
-/* Badge visible desde el inicio — se oculta al abrir el chat */
+/* Inicia la conexión del chat en segundo plano para poder notificar respuestas del soporte */
+waitForFirebaseChat(() => { chatStarted = true; initChat(); });
 
 // Wait for DOM paint, then start
 window.addEventListener('load', () => {
@@ -1319,128 +1836,10 @@ window.addEventListener('load', () => {
   countUp(elMembers, 1, 85, 'K', 1800, 500);
 });
 
-/* ── AÑADIR GRUPO ── */
+/* ── AÑADIR GRUPO — dos modales separados ── */
 (function(){
-  let selectedPlat = 'wa';
-  let selectedEmoji = '🇩🇪';
-
-  const overlay   = document.getElementById('addGroupOverlay');
-  const openBtns  = [document.getElementById('openAddGroup'), document.getElementById('openAddGroup2')];
-  const closeBtn  = document.getElementById('closeAddGroup');
-  const cancelBtn = document.getElementById('agCancel');
-  const submitBtn = document.getElementById('agSubmit');
-  const errorEl   = document.getElementById('agError');
-  const toast     = document.getElementById('agToast');
-  const toastMsg  = document.getElementById('agToastMsg');
-  const descInput = document.getElementById('ag-desc');
-  const descCount = document.getElementById('agDescCount');
-
-  function openModal() {
-    window.open('https://safeoffers.pro/a/2k1VPT8RK5c27qy', '_blank', 'noopener');
-  }
-  function closeModal() {
-    overlay.classList.remove('open');
-    document.body.style.overflow = '';
-  }
-
-  openBtns.forEach(btn => btn && btn.addEventListener('click', openModal));
-  closeBtn.addEventListener('click', closeModal);
-  cancelBtn.addEventListener('click', closeModal);
-  overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
-
-  // Platform toggle
-  document.querySelectorAll('.ag-plat-btn').forEach(btn => {
-    btn.addEventListener('click', function() {
-      document.querySelectorAll('.ag-plat-btn').forEach(b => b.classList.remove('active'));
-      this.classList.add('active');
-      selectedPlat = this.dataset.plat;
-    });
-  });
-
-  // Emoji picker
-  document.querySelectorAll('.ag-emoji').forEach(btn => {
-    btn.addEventListener('click', function() {
-      document.querySelectorAll('.ag-emoji').forEach(b => b.classList.remove('active'));
-      this.classList.add('active');
-      selectedEmoji = this.dataset.e;
-    });
-  });
-
-  // Char counter
-  descInput.addEventListener('input', () => {
-    descCount.textContent = descInput.value.length;
-  });
-
-  // Validation & submit
-  submitBtn.addEventListener('click', () => {
-    const name    = document.getElementById('ag-name').value.trim();
-    const desc    = descInput.value.trim();
-    const cat     = document.getElementById('ag-cat').value;
-    const link    = document.getElementById('ag-link').value.trim();
-    const members = document.getElementById('ag-members').value.trim() || '100';
-
-    errorEl.classList.remove('show');
-    errorEl.textContent = '';
-
-    if (!name) { showError('Bitte gib einen Gruppennamen ein.'); return; }
-    if (!desc)  { showError('Bitte füge eine kurze Beschreibung hinzu.'); return; }
-    if (!cat)   { showError('Bitte wähle eine Kategorie.'); return; }
-    if (!link || (!link.includes('chat.whatsapp.com') && !link.includes('t.me'))) {
-      showError('Bitte gib einen gültigen WhatsApp- oder Telegram-Link ein.'); return;
-    }
-
-    submitBtn.disabled = true;
-    submitBtn.textContent = '⏳ Wird hinzugefügt...';
-
-    setTimeout(() => {
-      const newGroup = {
-        icon: selectedEmoji,
-        name: name,
-        desc: desc,
-        plat: selectedPlat,
-        cat: cat,
-        members: members,
-        badge: '✨ NEW',
-        link: link
-      };
-
-      allGroups.unshift(newGroup);
-      filtered = getFiltered(activeFilter);
-      currentPage = 1;
-      renderGroups();
-
-      // Update stats
-      const el = document.getElementById('totalGroups');
-      el.textContent = allGroups.length;
-      el.classList.remove('counting');
-      void el.offsetWidth;
-      el.classList.add('counting');
-
-      submitBtn.disabled = false;
-      submitBtn.textContent = '✦ Gruppe veröffentlichen';
-      closeModal();
-      resetForm();
-      showToast('✦ Gruppe erfolgreich hinzugefügt!');
-    }, 900);
-  });
-
-  function showError(msg) {
-    errorEl.textContent = msg;
-    errorEl.classList.add('show');
-  }
-
-  function resetForm() {
-    document.getElementById('ag-name').value = '';
-    document.getElementById('ag-desc').value = '';
-    document.getElementById('ag-cat').value = '';
-    document.getElementById('ag-link').value = '';
-    document.getElementById('ag-members').value = '';
-    descCount.textContent = '0';
-    selectedPlat = 'wa'; selectedEmoji = '🇩🇪';
-    document.querySelectorAll('.ag-plat-btn').forEach((b,i) => b.classList.toggle('active', i===0));
-    document.querySelectorAll('.ag-emoji').forEach((b,i) => b.classList.toggle('active', i===0));
-    errorEl.classList.remove('show');
-  }
+  const toast    = document.getElementById('agToast');
+  const toastMsg = document.getElementById('agToastMsg');
 
   function showToast(msg) {
     toastMsg.textContent = msg;
@@ -1448,11 +1847,152 @@ window.addEventListener('load', () => {
     setTimeout(() => toast.classList.remove('show'), 3200);
   }
 
-  // Keyboard close
+  async function saveGroupToProfile(group) {
+    const fb = window._fb;
+    if (!fb) return;
+    const user = fb.auth.currentUser;
+    if (!user) return;
+    try {
+      await fb.addDoc(fb.collection(fb.db, 'groups'), {
+        ...group,
+        uid: user.uid,
+        createdAt: fb.serverTimestamp()
+      });
+    } catch(e) { console.error('Firestore save error:', e); }
+  }
+
+  function publishGroup(group) {
+    allGroups.push(group);
+    filtered = getFiltered(activeFilter);
+    const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
+    currentPage = Math.max(totalPages, 2); // las nuevas siempre quedan desde la página 2 en adelante
+    renderGroups();
+    saveGroupToProfile(group);
+    const el = document.getElementById('totalGroups');
+    el.textContent = allGroups.length;
+    el.classList.remove('counting');
+    void el.offsetWidth;
+    el.classList.add('counting');
+  }
+
+  /* ── Category pill toggle ── */
+  document.querySelectorAll('.ag-cat-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const form = this.dataset.form;
+      document.querySelectorAll(`.ag-cat-btn[data-form="${form}"]`).forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+    });
+  });
+
+  /* ── Char counters ── */
+  document.getElementById('wa-desc').addEventListener('input', function(){
+    document.getElementById('waDescCount').textContent = this.value.length;
+  });
+  document.getElementById('tg-desc').addEventListener('input', function(){
+    document.getElementById('tgDescCount').textContent = this.value.length;
+  });
+
+  /* ── WHATSAPP MODAL ── */
+  const modalWa = document.getElementById('modalWa');
+
+  function openWa() { modalWa.classList.add('open'); document.body.style.overflow = 'hidden'; }
+  function closeWa() {
+    modalWa.classList.remove('open'); document.body.style.overflow = '';
+    resetWa();
+  }
+  function resetWa() {
+    ['wa-name','wa-desc','wa-link'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('waDescCount').textContent = '0';
+    document.getElementById('waError').textContent = '';
+    document.querySelectorAll('.ag-cat-btn[data-form="wa"]').forEach(b => b.classList.remove('active'));
+  }
+
+  document.getElementById('openAddGroup').addEventListener('click', openWa);
+  document.getElementById('closeWa').addEventListener('click', closeWa);
+  document.getElementById('waCancel').addEventListener('click', closeWa);
+  modalWa.addEventListener('click', e => { if (e.target === modalWa) closeWa(); });
+
+  document.getElementById('waSubmit').addEventListener('click', () => {
+    const name  = document.getElementById('wa-name').value.trim();
+    const desc  = document.getElementById('wa-desc').value.trim();
+    const link  = document.getElementById('wa-link').value.trim();
+    const catBtn = document.querySelector('.ag-cat-btn[data-form="wa"].active');
+    const cat   = catBtn ? catBtn.dataset.cat : '';
+    const err   = document.getElementById('waError');
+    err.textContent = '';
+
+    if (!name)                       { err.textContent = 'Bitte gib einen Gruppennamen ein.'; return; }
+    if (!desc)                       { err.textContent = 'Bitte füge eine Beschreibung hinzu.'; return; }
+    if (!cat)                        { err.textContent = 'Bitte wähle eine Kategorie.'; return; }
+    if (!link || !link.includes('chat.whatsapp.com')) {
+      err.textContent = 'Bitte gib einen gültigen WhatsApp-Link ein (chat.whatsapp.com).'; return;
+    }
+
+    const btn = document.getElementById('waSubmit');
+    btn.disabled = true; btn.textContent = '⏳ Wird hinzugefügt...';
+
+    setTimeout(() => {
+      publishGroup({ icon:'💬', name, desc, plat:'wa', cat, members:'—', badge:'✨ NEW', link });
+      btn.disabled = false; btn.textContent = '💬 Gruppe veröffentlichen';
+      closeWa();
+      showToast('💬 WhatsApp-Gruppe erfolgreich hinzugefügt!');
+    }, 800);
+  });
+
+  /* ── TELEGRAM MODAL ── */
+  const modalTg = document.getElementById('modalTg');
+
+  function openTg() { modalTg.classList.add('open'); document.body.style.overflow = 'hidden'; }
+  function closeTg() {
+    modalTg.classList.remove('open'); document.body.style.overflow = '';
+    resetTg();
+  }
+  function resetTg() {
+    ['tg-name','tg-desc','tg-link'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('tgDescCount').textContent = '0';
+    document.getElementById('tgError').textContent = '';
+    document.querySelectorAll('.ag-cat-btn[data-form="tg"]').forEach(b => b.classList.remove('active'));
+  }
+
+  document.getElementById('openAddGroup2').addEventListener('click', openTg);
+  document.getElementById('closeTg').addEventListener('click', closeTg);
+  document.getElementById('tgCancel').addEventListener('click', closeTg);
+  modalTg.addEventListener('click', e => { if (e.target === modalTg) closeTg(); });
+
+  document.getElementById('tgSubmit').addEventListener('click', () => {
+    const name  = document.getElementById('tg-name').value.trim();
+    const desc  = document.getElementById('tg-desc').value.trim();
+    const link  = document.getElementById('tg-link').value.trim();
+    const catBtn = document.querySelector('.ag-cat-btn[data-form="tg"].active');
+    const cat   = catBtn ? catBtn.dataset.cat : '';
+    const err   = document.getElementById('tgError');
+    err.textContent = '';
+
+    if (!name)                    { err.textContent = 'Bitte gib einen Gruppennamen ein.'; return; }
+    if (!desc)                    { err.textContent = 'Bitte füge eine Beschreibung hinzu.'; return; }
+    if (!cat)                     { err.textContent = 'Bitte wähle eine Kategorie.'; return; }
+    if (!link || !link.includes('t.me')) {
+      err.textContent = 'Bitte gib einen gültigen Telegram-Link ein (t.me/...).'; return;
+    }
+
+    const btn = document.getElementById('tgSubmit');
+    btn.disabled = true; btn.textContent = '⏳ Wird hinzugefügt...';
+
+    setTimeout(() => {
+      publishGroup({ icon:'✈️', name, desc, plat:'tg', cat, members:'—', badge:'✨ NEW', link });
+      btn.disabled = false; btn.textContent = '✈️ Gruppe veröffentlichen';
+      closeTg();
+      showToast('✈️ Telegram-Gruppe erfolgreich hinzugefügt!');
+    }, 800);
+  });
+
+  /* Escape key */
   document.addEventListener('keydown', e => {
-    if (e.key === 'Escape' && overlay.classList.contains('open')) closeModal();
+    if (e.key === 'Escape') { closeWa(); closeTg(); }
   });
 })();
+
+
 
 
 
@@ -1479,4 +2019,408 @@ window.addEventListener('load', () => {
     ).join(';');
     banner.appendChild(el);
   });
-})();</script></html>
+})();
+
+/* ── AUTH SYSTEM — Firebase ── */
+(function(){
+  const authOverlay    = document.getElementById('authOverlay');
+  const profileOverlay = document.getElementById('profileOverlay');
+  const authHeaderBtn  = document.getElementById('authHeaderBtn');
+
+  // ── Toast helper (reuse existing toast element) ──
+  function showToast(msg) {
+    const toast = document.getElementById('agToast');
+    document.getElementById('agToastMsg').textContent = msg;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 3200);
+  }
+
+  // ── UI helpers ──
+  function openAuth()    { authOverlay.classList.add('open'); }
+  function closeAuth()   { authOverlay.classList.remove('open'); }
+  function openProfile() { fillProfile(); profileOverlay.classList.add('open'); }
+  function closeProfile(){ profileOverlay.classList.remove('open'); }
+
+  function updateHeaderBtn(user) {
+    if (user) {
+      authHeaderBtn.textContent = '👤 ' + (user.displayName || user.email.split('@')[0]);
+      authHeaderBtn.classList.add('logged-in');
+    } else {
+      authHeaderBtn.textContent = '👤 Anmelden';
+      authHeaderBtn.classList.remove('logged-in');
+    }
+  }
+
+  // ── Fill profile modal with Firestore groups ──
+  async function fillProfile() {
+    const fb   = window._fb;
+    const user = fb ? fb.auth.currentUser : null;
+    if (!user) return;
+
+    document.getElementById('profileUsername').textContent = user.displayName || 'Benutzer';
+    document.getElementById('profileEmail').textContent    = user.email;
+    const avatars = ['💕','🌹','✨','💎','🦋','🔥','💘','🌟'];
+    document.getElementById('profileAvatar').textContent   = avatars[user.email.charCodeAt(0) % avatars.length];
+
+    const container = document.getElementById('profileGroups');
+    container.innerHTML = '<div class="profile-empty" style="opacity:0.5">⏳ Laden...</div>';
+
+    try {
+      const q    = fb.query(fb.collection(fb.db, 'groups'), fb.where('uid','==', user.uid));
+      const snap = await fb.getDocs(q);
+      const docs = [];
+      snap.forEach(d => docs.push({ id: d.id, ...d.data() }));
+
+      if (docs.length === 0) {
+        container.innerHTML = '<div class="profile-empty">Du hast noch keine Gruppen hinzugefügt.</div>';
+        document.getElementById('profileGroupCount').textContent = '0';
+        return;
+      }
+      document.getElementById('profileGroupCount').textContent = docs.length;
+
+      container.innerHTML = '';
+      docs.forEach(g => {
+        const dispIcon = (g.icon === '💬' || g.icon === '✈️')
+          ? (g.cat === 'Dating' ? '💘' : '🤝') : g.icon;
+        const item = document.createElement('div');
+        item.className = 'profile-group-item';
+        item.innerHTML = `
+          <div class="pgi-icon">${dispIcon}</div>
+          <div class="pgi-info">
+            <div class="pgi-name">${g.name}</div>
+            <div class="pgi-plat">${g.plat === 'wa' ? '💬 WhatsApp' : '✈️ Telegram'} · ${g.cat}</div>
+          </div>
+          <div style="display:flex;gap:6px;flex-shrink:0;align-items:center;">
+            <a href="${g.link}" target="_blank" rel="noopener" class="pgi-link ${g.plat}">→ Öffnen</a>
+            <button class="pgi-delete" data-docid="${g.id}" data-link="${g.link}" data-name="${g.name}" title="Gruppe löschen">🗑</button>
+          </div>`;
+        container.appendChild(item);
+      });
+
+      // Delete handlers
+      container.querySelectorAll('.pgi-delete').forEach(btn => {
+        btn.addEventListener('click', async function() {
+          const docId   = this.dataset.docid;
+          const gLink   = this.dataset.link;
+          const gName   = this.dataset.name;
+          this.textContent = '⏳';
+          this.disabled = true;
+          try {
+            await fb.deleteDoc(fb.doc(fb.db, 'groups', docId));
+            // Remove from live allGroups array
+            const gIdx = allGroups.findIndex(g => g.link === gLink && g.name === gName);
+            if (gIdx !== -1) {
+              allGroups.splice(gIdx, 1);
+              filtered = getFiltered(activeFilter);
+              if (currentPage > Math.ceil(filtered.length / PER_PAGE)) currentPage = 1;
+              renderGroups();
+            }
+            fillProfile();
+          } catch(e) {
+            this.textContent = '🗑';
+            this.disabled = false;
+            showToast('❌ Fehler beim Löschen. Bitte erneut versuchen.');
+          }
+        });
+      });
+
+    } catch(e) {
+      container.innerHTML = '<div class="profile-empty">Fehler beim Laden der Gruppen.</div>';
+      console.error(e);
+    }
+  }
+
+  // ── Wait for Firebase to be ready ──
+  function waitForFirebase(cb, tries = 0) {
+    if (window._fb) { cb(); }
+    else if (tries < 40) { setTimeout(() => waitForFirebase(cb, tries + 1), 100); }
+  }
+
+  waitForFirebase(() => {
+    const fb = window._fb;
+
+    // Auth state listener — runs on every page load
+    fb.onAuthStateChanged(fb.auth, user => {
+      updateHeaderBtn(user);
+      // Reconectar el chat con la identidad correcta (uid o invitado)
+      if (typeof currentChatId === 'function') {
+        const newId = currentChatId();
+        if (newId !== chatId) { chatStarted = true; initChat(); }
+      }
+    });
+
+    authHeaderBtn.addEventListener('click', () => {
+      if (fb.auth.currentUser) openProfile();
+      else openAuth();
+    });
+
+    // ── TABS ──
+    document.querySelectorAll('.auth-tab').forEach(tab => {
+      tab.addEventListener('click', function() {
+        document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+        this.classList.add('active');
+        const panel = this.dataset.tab;
+        document.getElementById('panelLogin').style.display    = panel === 'login'    ? '' : 'none';
+        document.getElementById('panelRegister').style.display = panel === 'register' ? '' : 'none';
+      });
+    });
+
+    // ── REGISTER ──
+    document.getElementById('regSubmit').addEventListener('click', async () => {
+      const name  = document.getElementById('regName').value.trim();
+      const email = document.getElementById('regEmail').value.trim();
+      const pass  = document.getElementById('regPass').value;
+      const err   = document.getElementById('regError');
+      const btn   = document.getElementById('regSubmit');
+      err.textContent = '';
+      if (!name)               { err.textContent = 'Bitte Benutzernamen eingeben.'; return; }
+      if (!email.includes('@')){ err.textContent = 'Bitte gültige E-Mail eingeben.'; return; }
+      if (pass.length < 6)     { err.textContent = 'Passwort muss mindestens 6 Zeichen haben.'; return; }
+
+      btn.disabled = true; btn.textContent = '⏳ Registrieren...';
+      try {
+        const cred = await fb.createUserWithEmailAndPassword(fb.auth, email, pass);
+        await fb.updateProfile(cred.user, { displayName: name });
+        closeAuth();
+        updateHeaderBtn(cred.user);
+        showToast('✦ Konto erstellt! Willkommen, ' + name + '!');
+      } catch(e) {
+        const msgs = {
+          'auth/email-already-in-use': 'Diese E-Mail ist bereits registriert.',
+          'auth/invalid-email':        'Ungültige E-Mail-Adresse.',
+          'auth/weak-password':        'Passwort zu schwach (min. 6 Zeichen).'
+        };
+        err.textContent = msgs[e.code] || 'Fehler: ' + e.message;
+      } finally {
+        btn.disabled = false; btn.textContent = '✦ Konto erstellen';
+      }
+    });
+
+    // ── LOGIN ──
+    document.getElementById('loginSubmit').addEventListener('click', async () => {
+      const email = document.getElementById('loginEmail').value.trim();
+      const pass  = document.getElementById('loginPass').value;
+      const err   = document.getElementById('loginError');
+      const btn   = document.getElementById('loginSubmit');
+      err.textContent = '';
+
+      // ── Acceso especial de administrador (soporte) ──
+      if (email === 'admin' && pass === '2772274032') {
+        localStorage.setItem('lc_admin', '1');
+        closeAuth();
+        showToast('🛠 Willkommen im Support-Panel, Admin!');
+        if (typeof openAdminPanel === 'function') openAdminPanel();
+        if (typeof updateAdminVisibility === 'function') updateAdminVisibility();
+        return;
+      }
+
+      btn.disabled = true; btn.textContent = '⏳ Anmelden...';
+      try {
+        const cred = await fb.signInWithEmailAndPassword(fb.auth, email, pass);
+        closeAuth();
+        updateHeaderBtn(cred.user);
+        showToast('✦ Willkommen zurück, ' + (cred.user.displayName || email.split('@')[0]) + '!');
+      } catch(e) {
+        const msgs = {
+          'auth/user-not-found':   'Kein Konto mit dieser E-Mail gefunden.',
+          'auth/wrong-password':   'Falsches Passwort.',
+          'auth/invalid-email':    'Ungültige E-Mail-Adresse.',
+          'auth/invalid-credential': 'E-Mail oder Passwort falsch.'
+        };
+        err.textContent = msgs[e.code] || 'Fehler: ' + e.message;
+      } finally {
+        btn.disabled = false; btn.textContent = '✦ Anmelden';
+      }
+    });
+
+    // ── GOOGLE SIGN-IN (login y registro) ──
+    async function handleGoogleAuth(btn) {
+      const provider = new fb.GoogleAuthProvider();
+      btn.disabled = true;
+      try {
+        const cred = await fb.signInWithPopup(fb.auth, provider);
+        closeAuth();
+        updateHeaderBtn(cred.user);
+        showToast('✦ Willkommen, ' + (cred.user.displayName || cred.user.email.split('@')[0]) + '!');
+      } catch(e) {
+        console.error('Google sign-in error:', e);
+        showToast('❌ Google-Anmeldung fehlgeschlagen. Bitte erneut versuchen.');
+      } finally {
+        btn.disabled = false;
+      }
+    }
+    document.getElementById('googleLoginBtn').addEventListener('click', function(){ handleGoogleAuth(this); });
+    document.getElementById('googleRegBtn').addEventListener('click', function(){ handleGoogleAuth(this); });
+
+    // ── LOGOUT ──
+    document.getElementById('logoutBtn').addEventListener('click', async () => {
+      await fb.signOut(fb.auth);
+      closeProfile();
+      updateHeaderBtn(null);
+      showToast('✦ Erfolgreich abgemeldet.');
+    });
+
+    // ── MODAL CLOSE ──
+    document.getElementById('closeAuth').addEventListener('click', closeAuth);
+    document.getElementById('closeProfile').addEventListener('click', closeProfile);
+    authOverlay.addEventListener('click', e => { if (e.target === authOverlay) closeAuth(); });
+    profileOverlay.addEventListener('click', e => { if (e.target === profileOverlay) closeProfile(); });
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') { closeAuth(); closeProfile(); }
+    });
+  });
+})();
+
+/* ── ADMIN / SUPPORT PANEL ── */
+(function(){
+  const adminToggle   = document.getElementById('adminToggle');
+  const adminBadge    = document.getElementById('adminBadge');
+  const adminPanel    = document.getElementById('adminPanel');
+  const closeAdminBtn = document.getElementById('closeAdmin');
+  const logoutAdminBtn= document.getElementById('adminLogoutBtn');
+  const convList      = document.getElementById('adminConvList');
+  const chatHeader     = document.getElementById('adminChatHeader');
+  const adminMessages  = document.getElementById('adminMessages');
+  const adminInput     = document.getElementById('adminInput');
+  const adminSendBtn   = document.getElementById('adminSend');
+
+  let activeConvId   = null;
+  let conversations  = [];
+  let unsubConvs      = null;
+  let unsubAdminMsgs  = null;
+
+  function isAdmin() { return localStorage.getItem('lc_admin') === '1'; }
+
+  window.updateAdminVisibility = function() {
+    if (isAdmin()) {
+      adminToggle.style.display = 'flex';
+      startListeningConversations();
+    } else {
+      adminToggle.style.display = 'none';
+      adminPanel.classList.remove('open');
+      if (unsubConvs) { unsubConvs(); unsubConvs = null; }
+      if (unsubAdminMsgs) { unsubAdminMsgs(); unsubAdminMsgs = null; }
+    }
+  };
+
+  window.openAdminPanel = function() {
+    adminPanel.classList.add('open');
+  };
+  function closeAdminPanel() { adminPanel.classList.remove('open'); }
+
+  function fmtTimeAdmin(ts) {
+    try {
+      const d = ts && ts.toDate ? ts.toDate() : null;
+      return d ? d.toLocaleString('de-DE', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) : '';
+    } catch(e) { return ''; }
+  }
+
+  function renderConvList() {
+    convList.innerHTML = '';
+    if (conversations.length === 0) {
+      convList.innerHTML = '<div class="adm-empty">Noch keine Unterhaltungen.</div>';
+      adminBadge.style.display = 'none';
+      return;
+    }
+    let totalUnread = 0;
+    conversations.forEach(c => {
+      totalUnread += (c.unreadAdmin || 0);
+      const item = document.createElement('div');
+      item.className = 'adm-conv-item' + (c.id === activeConvId ? ' active' : '');
+      item.innerHTML = `
+        <div class="adm-conv-avatar">${(c.name || '?').charAt(0).toUpperCase()}</div>
+        <div class="adm-conv-info">
+          <div class="adm-conv-name">${escapeHtmlAdmin(c.name || 'Unbekannt')}</div>
+          <div class="adm-conv-last">${escapeHtmlAdmin(c.lastMessage || '')}</div>
+        </div>
+        ${c.unreadAdmin > 0 ? `<div class="adm-conv-unread">${c.unreadAdmin}</div>` : ''}`;
+      item.addEventListener('click', () => openConversation(c.id));
+      convList.appendChild(item);
+    });
+    if (totalUnread > 0) {
+      adminBadge.style.display = 'flex';
+      adminBadge.textContent = totalUnread;
+    } else {
+      adminBadge.style.display = 'none';
+    }
+  }
+
+  function escapeHtmlAdmin(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function startListeningConversations() {
+    const fb = window._fb;
+    if (!fb) { setTimeout(startListeningConversations, 200); return; }
+    if (unsubConvs) unsubConvs();
+    const q = fb.query(fb.collection(fb.db, 'chats'), fb.orderBy('lastAt', 'desc'));
+    unsubConvs = fb.onSnapshot(q, snap => {
+      conversations = [];
+      snap.forEach(d => conversations.push({ id: d.id, ...d.data() }));
+      renderConvList();
+    }, err => console.error('admin conversations listener error:', err));
+  }
+
+  function openConversation(id) {
+    activeConvId = id;
+    const conv = conversations.find(c => c.id === id);
+    chatHeader.textContent = conv ? `💬 ${conv.name}${conv.email ? ' · ' + conv.email : ''}` : 'Unterhaltung';
+    adminInput.disabled = false;
+    adminSendBtn.disabled = false;
+    renderConvList();
+
+    const fb = window._fb;
+    if (unsubAdminMsgs) unsubAdminMsgs();
+    const q = fb.query(fb.collection(fb.db, 'chats', id, 'messages'), fb.orderBy('createdAt', 'asc'));
+    unsubAdminMsgs = fb.onSnapshot(q, snap => {
+      adminMessages.innerHTML = '';
+      snap.forEach(d => {
+        const m = d.data();
+        const row = document.createElement('div');
+        row.className = 'adm-msg-row ' + (m.sender === 'admin' ? 'from-admin' : 'from-user');
+        row.innerHTML = `<div class="adm-bubble">${escapeHtmlAdmin(m.text)}</div>`;
+        adminMessages.appendChild(row);
+      });
+      adminMessages.scrollTop = adminMessages.scrollHeight;
+    }, err => console.error('admin messages listener error:', err));
+
+    // Marcar como leído por el admin
+    fb.updateDoc(fb.doc(fb.db, 'chats', id), { unreadAdmin: 0 }).catch(()=>{});
+  }
+
+  async function sendAdminReply() {
+    const text = adminInput.value.trim();
+    if (!text || !activeConvId) return;
+    adminInput.value = '';
+    const fb = window._fb;
+    try {
+      await fb.addDoc(fb.collection(fb.db, 'chats', activeConvId, 'messages'), {
+        sender: 'admin',
+        text,
+        createdAt: fb.serverTimestamp()
+      });
+      await fb.updateDoc(fb.doc(fb.db, 'chats', activeConvId), {
+        lastMessage: text,
+        lastAt: fb.serverTimestamp(),
+        unreadUser: fb.increment(1)
+      });
+    } catch(e) { console.error('admin reply error:', e); }
+  }
+
+  adminSendBtn.addEventListener('click', sendAdminReply);
+  adminInput.addEventListener('keydown', e => { if (e.key === 'Enter') sendAdminReply(); });
+
+  adminToggle.addEventListener('click', () => { window.openAdminPanel(); });
+  closeAdminBtn.addEventListener('click', closeAdminPanel);
+  logoutAdminBtn.addEventListener('click', () => {
+    localStorage.removeItem('lc_admin');
+    closeAdminPanel();
+    window.updateAdminVisibility();
+  });
+
+  // Comprobar al cargar si ya hay una sesión de admin activa
+  window.updateAdminVisibility();
+})();
+</script></html>
