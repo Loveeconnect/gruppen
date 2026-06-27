@@ -319,12 +319,14 @@ border-top:1px solid var(--border);
 padding:10px 12px;
 display:flex; gap:8px; align-items:center;
 background:var(--dark3);
+pointer-events:auto;
 ">
    <input id="cwInput" type="text" placeholder="Nachricht schreiben..." maxlength="500" style="
 flex:1; background:var(--dark); border:1px solid var(--border);
 border-radius:20px; padding:8px 14px;
 color:var(--text); font-family:'DM Sans',sans-serif; font-size:13px;
 outline:none; transition:border-color 0.2s;
+pointer-events:auto; cursor:text; position:relative; z-index:1;
 " />
    <button id="cwSend" style="
 width:34px; height:34px; border-radius:50%; border:none;
@@ -336,7 +338,7 @@ flex-shrink:0; transition:transform 0.15s;
   </div>
  </div>
 
- <!-- ADMIN PANEL (solo visible para la cuenta admin) -->
+ <!-- ADMIN PANEL (solo visible para el admin logueado) -->
  <button id="adminToggle" aria-label="Admin-Panel öffnen" style="display:none">
   🛠 Admin
   <span id="adminBadge" style="display:none">0</span>
@@ -651,6 +653,7 @@ header {
   transition:transform 0.3s cubic-bezier(0.34,1.56,0.64,1), opacity 0.25s ease;
 }
 #chatWindow.open { transform:scale(1) translateY(0); opacity:1; pointer-events:all; }
+#chatWindow.open * { pointer-events:auto; }
 
 .cw-topbar {
   background:var(--dark3); border-bottom:1px solid var(--border);
@@ -1767,14 +1770,21 @@ async function initChat() {
 
 /* ── Toggle abrir/cerrar ── */
 toggle.addEventListener('click', () => {
+  // Si el usuario logueado es admin, la burbuja abre el panel de soporte
+  const fb = window._fb;
+  const user = fb && fb.auth && fb.auth.currentUser;
+  if (user && window.isAdminUser && window.isAdminUser(user)) {
+    if (typeof window.openAdminPanel === 'function') window.openAdminPanel();
+    return;
+  }
+
   opened = !opened;
   win.classList.toggle('open', opened);
   if (opened) {
     badge.style.display = 'none';
     toggle.innerHTML = '✕<span id="notifBadge" style="display:none">1</span>';
     if (chatId) {
-      const fb = window._fb;
-      fb.updateDoc(fb.doc(fb.db, 'chats', chatId), { unreadUser: 0 }).catch(()=>{});
+      fb && fb.updateDoc(fb.doc(fb.db, 'chats', chatId), { unreadUser: 0 }).catch(()=>{});
     }
     setTimeout(() => cwInput.focus(), 400);
   } else {
@@ -2053,7 +2063,18 @@ window.addEventListener('load', () => {
   const profileOverlay = document.getElementById('profileOverlay');
   const authHeaderBtn  = document.getElementById('authHeaderBtn');
 
-  // ── Toast helper (reuse existing toast element) ──
+  // ╔══════════════════════════════════════════════════╗
+  // ║  PON AQUÍ TU EMAIL DE ADMINISTRADOR             ║
+  const ADMIN_EMAIL = 'tu_email@gmail.com';
+  // ╚══════════════════════════════════════════════════╝
+
+  window.ADMIN_EMAIL = ADMIN_EMAIL;
+
+  function isAdminUser(user) {
+    return user && user.email && user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  }
+  window.isAdminUser = isAdminUser;
+
   function showToast(msg) {
     const toast = document.getElementById('agToast');
     document.getElementById('agToastMsg').textContent = msg;
@@ -2061,7 +2082,6 @@ window.addEventListener('load', () => {
     setTimeout(() => toast.classList.remove('show'), 3200);
   }
 
-  // ── UI helpers ──
   function openAuth()    { authOverlay.classList.add('open'); }
   function closeAuth()   { authOverlay.classList.remove('open'); }
   function openProfile() { fillProfile(); profileOverlay.classList.add('open'); }
@@ -2069,7 +2089,8 @@ window.addEventListener('load', () => {
 
   function updateHeaderBtn(user) {
     if (user) {
-      authHeaderBtn.textContent = '👤 ' + (user.displayName || user.email.split('@')[0]);
+      const label = isAdminUser(user) ? '🛠 ' : '👤 ';
+      authHeaderBtn.textContent = label + (user.displayName || user.email.split('@')[0]);
       authHeaderBtn.classList.add('logged-in');
     } else {
       authHeaderBtn.textContent = '👤 Anmelden';
@@ -2077,7 +2098,6 @@ window.addEventListener('load', () => {
     }
   }
 
-  // ── Fill profile modal with Firestore groups ──
   async function fillProfile() {
     const fb   = window._fb;
     const user = fb ? fb.auth.currentUser : null;
@@ -2087,6 +2107,10 @@ window.addEventListener('load', () => {
     document.getElementById('profileEmail').textContent    = user.email;
     const avatars = ['💕','🌹','✨','💎','🦋','🔥','💘','🌟'];
     document.getElementById('profileAvatar').textContent   = avatars[user.email.charCodeAt(0) % avatars.length];
+
+    if (isAdminUser(user)) {
+      document.getElementById('profileAvatar').textContent = '🛠';
+    }
 
     const container = document.getElementById('profileGroups');
     container.innerHTML = '<div class="profile-empty" style="opacity:0.5">⏳ Laden...</div>';
@@ -2123,7 +2147,6 @@ window.addEventListener('load', () => {
         container.appendChild(item);
       });
 
-      // Delete handlers
       container.querySelectorAll('.pgi-delete').forEach(btn => {
         btn.addEventListener('click', async function() {
           const docId   = this.dataset.docid;
@@ -2133,7 +2156,6 @@ window.addEventListener('load', () => {
           this.disabled = true;
           try {
             await fb.deleteDoc(fb.doc(fb.db, 'groups', docId));
-            // Remove from live allGroups array
             const gIdx = allGroups.findIndex(g => g.link === gLink && g.name === gName);
             if (gIdx !== -1) {
               allGroups.splice(gIdx, 1);
@@ -2156,7 +2178,6 @@ window.addEventListener('load', () => {
     }
   }
 
-  // ── Wait for Firebase to be ready ──
   function waitForFirebase(cb, tries = 0) {
     if (window._fb) { cb(); }
     else if (tries < 40) { setTimeout(() => waitForFirebase(cb, tries + 1), 100); }
@@ -2165,13 +2186,20 @@ window.addEventListener('load', () => {
   waitForFirebase(() => {
     const fb = window._fb;
 
-    // Auth state listener — runs on every page load
     fb.onAuthStateChanged(fb.auth, user => {
       updateHeaderBtn(user);
-      // Reconectar el chat con la identidad correcta (uid o invitado)
-      if (typeof currentChatId === 'function') {
-        const newId = currentChatId();
-        if (newId !== chatId) { chatStarted = true; initChat(); }
+
+      if (isAdminUser(user)) {
+        // El admin se loguea: activa panel admin y modo admin en el chat
+        if (typeof window.activateAdminMode === 'function') window.activateAdminMode();
+      } else {
+        // Usuario normal o logout
+        if (typeof window.deactivateAdminMode === 'function') window.deactivateAdminMode();
+        // Reconectar el chat con la identidad correcta
+        if (typeof currentChatId === 'function') {
+          const newId = currentChatId();
+          if (newId !== chatId) { chatStarted = true; initChat(); }
+        }
       }
     });
 
@@ -2180,7 +2208,6 @@ window.addEventListener('load', () => {
       else openAuth();
     });
 
-    // ── TABS ──
     document.querySelectorAll('.auth-tab').forEach(tab => {
       tab.addEventListener('click', function() {
         document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
@@ -2191,7 +2218,6 @@ window.addEventListener('load', () => {
       });
     });
 
-    // ── REGISTER ──
     document.getElementById('regSubmit').addEventListener('click', async () => {
       const name  = document.getElementById('regName').value.trim();
       const email = document.getElementById('regEmail').value.trim();
@@ -2202,7 +2228,6 @@ window.addEventListener('load', () => {
       if (!name)               { err.textContent = 'Bitte Benutzernamen eingeben.'; return; }
       if (!email.includes('@')){ err.textContent = 'Bitte gültige E-Mail eingeben.'; return; }
       if (pass.length < 6)     { err.textContent = 'Passwort muss mindestens 6 Zeichen haben.'; return; }
-
       btn.disabled = true; btn.textContent = '⏳ Registrieren...';
       try {
         const cred = await fb.createUserWithEmailAndPassword(fb.auth, email, pass);
@@ -2222,35 +2247,27 @@ window.addEventListener('load', () => {
       }
     });
 
-    // ── LOGIN ──
     document.getElementById('loginSubmit').addEventListener('click', async () => {
       const email = document.getElementById('loginEmail').value.trim();
       const pass  = document.getElementById('loginPass').value;
       const err   = document.getElementById('loginError');
       const btn   = document.getElementById('loginSubmit');
       err.textContent = '';
-
-      // ── Acceso especial de administrador (soporte) ──
-      if (email === 'admin' && pass === '2772274032') {
-        localStorage.setItem('lc_admin', '1');
-        closeAuth();
-        showToast('🛠 Willkommen im Support-Panel, Admin!');
-        if (typeof openAdminPanel === 'function') openAdminPanel();
-        if (typeof updateAdminVisibility === 'function') updateAdminVisibility();
-        return;
-      }
-
       btn.disabled = true; btn.textContent = '⏳ Anmelden...';
       try {
         const cred = await fb.signInWithEmailAndPassword(fb.auth, email, pass);
         closeAuth();
         updateHeaderBtn(cred.user);
-        showToast('✦ Willkommen zurück, ' + (cred.user.displayName || email.split('@')[0]) + '!');
+        if (isAdminUser(cred.user)) {
+          showToast('🛠 Willkommen Admin! Du hast vollen Zugriff.');
+        } else {
+          showToast('✦ Willkommen zurück, ' + (cred.user.displayName || email.split('@')[0]) + '!');
+        }
       } catch(e) {
         const msgs = {
-          'auth/user-not-found':   'Kein Konto mit dieser E-Mail gefunden.',
-          'auth/wrong-password':   'Falsches Passwort.',
-          'auth/invalid-email':    'Ungültige E-Mail-Adresse.',
+          'auth/user-not-found':     'Kein Konto mit dieser E-Mail gefunden.',
+          'auth/wrong-password':     'Falsches Passwort.',
+          'auth/invalid-email':      'Ungültige E-Mail-Adresse.',
           'auth/invalid-credential': 'E-Mail oder Passwort falsch.'
         };
         err.textContent = msgs[e.code] || 'Fehler: ' + e.message;
@@ -2259,7 +2276,6 @@ window.addEventListener('load', () => {
       }
     });
 
-    // ── GOOGLE SIGN-IN (login y registro) ──
     async function handleGoogleAuth(btn) {
       const provider = new fb.GoogleAuthProvider();
       btn.disabled = true;
@@ -2278,7 +2294,6 @@ window.addEventListener('load', () => {
     document.getElementById('googleLoginBtn').addEventListener('click', function(){ handleGoogleAuth(this); });
     document.getElementById('googleRegBtn').addEventListener('click', function(){ handleGoogleAuth(this); });
 
-    // ── LOGOUT ──
     document.getElementById('logoutBtn').addEventListener('click', async () => {
       await fb.signOut(fb.auth);
       closeProfile();
@@ -2286,7 +2301,6 @@ window.addEventListener('load', () => {
       showToast('✦ Erfolgreich abgemeldet.');
     });
 
-    // ── MODAL CLOSE ──
     document.getElementById('closeAuth').addEventListener('click', closeAuth);
     document.getElementById('closeProfile').addEventListener('click', closeProfile);
     authOverlay.addEventListener('click', e => { if (e.target === authOverlay) closeAuth(); });
@@ -2297,48 +2311,73 @@ window.addEventListener('load', () => {
   });
 })();
 
-/* ── ADMIN / SUPPORT PANEL ── */
+/* ── ADMIN / SUPPORT PANEL (activado automáticamente cuando el admin se loguea) ── */
 (function(){
-  const adminToggle   = document.getElementById('adminToggle');
-  const adminBadge    = document.getElementById('adminBadge');
-  const adminPanel    = document.getElementById('adminPanel');
-  const closeAdminBtn = document.getElementById('closeAdmin');
-  const logoutAdminBtn= document.getElementById('adminLogoutBtn');
-  const convList      = document.getElementById('adminConvList');
+  const adminToggle    = document.getElementById('adminToggle');
+  const adminBadge     = document.getElementById('adminBadge');
+  const adminPanel     = document.getElementById('adminPanel');
+  const closeAdminBtn  = document.getElementById('closeAdmin');
+  const logoutAdminBtn = document.getElementById('adminLogoutBtn');
+  const convList       = document.getElementById('adminConvList');
   const chatHeader     = document.getElementById('adminChatHeader');
   const adminMessages  = document.getElementById('adminMessages');
   const adminInput     = document.getElementById('adminInput');
   const adminSendBtn   = document.getElementById('adminSend');
 
-  let activeConvId   = null;
-  let conversations  = [];
-  let unsubConvs      = null;
-  let unsubAdminMsgs  = null;
+  let activeConvId  = null;
+  let conversations = [];
+  let unsubConvs    = null;
+  let unsubAdminMsgs= null;
 
-  function isAdmin() { return localStorage.getItem('lc_admin') === '1'; }
-
-  window.updateAdminVisibility = function() {
-    if (isAdmin()) {
-      adminToggle.style.display = 'flex';
-      startListeningConversations();
-    } else {
-      adminToggle.style.display = 'none';
-      adminPanel.classList.remove('open');
-      if (unsubConvs) { unsubConvs(); unsubConvs = null; }
-      if (unsubAdminMsgs) { unsubAdminMsgs(); unsubAdminMsgs = null; }
+  /* El admin se loguea con Firebase → onAuthStateChanged llama a esto */
+  window.activateAdminMode = function() {
+    adminToggle.style.display = 'flex';
+    // La burbuja del chat muestra un ícono de soporte
+    const chatToggleEl = document.getElementById('chatToggle');
+    if (chatToggleEl) {
+      chatToggleEl.innerHTML = '🎧<span id="notifBadge" style="display:none">1</span>';
+      chatToggleEl.title = 'Support-Panel öffnen';
     }
+    startListeningConversations();
+    // Escuchar mensajes no leídos de usuarios para mostrar badge en la burbuja
+    startListeningUnreadBadge();
   };
 
-  window.openAdminPanel = function() {
-    adminPanel.classList.add('open');
+  window.deactivateAdminMode = function() {
+    adminToggle.style.display = 'none';
+    adminPanel.classList.remove('open');
+    const chatToggleEl = document.getElementById('chatToggle');
+    if (chatToggleEl) chatToggleEl.innerHTML = '💬<span id="notifBadge" style="display:none">1</span>';
+    if (unsubConvs)    { unsubConvs(); unsubConvs = null; }
+    if (unsubAdminMsgs){ unsubAdminMsgs(); unsubAdminMsgs = null; }
+    if (unsubUnread)   { unsubUnread(); unsubUnread = null; }
   };
+
+  window.openAdminPanel = function() { adminPanel.classList.add('open'); };
   function closeAdminPanel() { adminPanel.classList.remove('open'); }
 
-  function fmtTimeAdmin(ts) {
-    try {
-      const d = ts && ts.toDate ? ts.toDate() : null;
-      return d ? d.toLocaleString('de-DE', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) : '';
-    } catch(e) { return ''; }
+  let unsubUnread = null;
+  function startListeningUnreadBadge() {
+    const fb = window._fb;
+    if (!fb) { setTimeout(startListeningUnreadBadge, 200); return; }
+    if (unsubUnread) unsubUnread();
+    // Suma todos los unreadAdmin de todas las conversaciones para el badge de la burbuja
+    const q = fb.query(fb.collection(fb.db, 'chats'), fb.orderBy('lastAt', 'desc'));
+    unsubUnread = fb.onSnapshot(q, snap => {
+      let total = 0;
+      snap.forEach(d => { total += (d.data().unreadAdmin || 0); });
+      const bubbleBadge = document.getElementById('notifBadge');
+      if (bubbleBadge) {
+        if (total > 0) { bubbleBadge.style.display = 'flex'; bubbleBadge.textContent = total; }
+        else { bubbleBadge.style.display = 'none'; }
+      }
+    });
+  }
+
+  function escapeHtmlAdmin(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
   }
 
   function renderConvList() {
@@ -2371,12 +2410,6 @@ window.addEventListener('load', () => {
     }
   }
 
-  function escapeHtmlAdmin(str) {
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
-  }
-
   function startListeningConversations() {
     const fb = window._fb;
     if (!fb) { setTimeout(startListeningConversations, 200); return; }
@@ -2392,7 +2425,9 @@ window.addEventListener('load', () => {
   function openConversation(id) {
     activeConvId = id;
     const conv = conversations.find(c => c.id === id);
-    chatHeader.textContent = conv ? `💬 ${conv.name}${conv.email ? ' · ' + conv.email : ''}` : 'Unterhaltung';
+    chatHeader.textContent = conv
+      ? `💬 ${conv.name}${conv.email ? ' · ' + conv.email : ''}`
+      : 'Unterhaltung';
     adminInput.disabled = false;
     adminSendBtn.disabled = false;
     renderConvList();
@@ -2412,7 +2447,6 @@ window.addEventListener('load', () => {
       adminMessages.scrollTop = adminMessages.scrollHeight;
     }, err => console.error('admin messages listener error:', err));
 
-    // Marcar como leído por el admin
     fb.updateDoc(fb.doc(fb.db, 'chats', id), { unreadAdmin: 0 }).catch(()=>{});
   }
 
@@ -2423,9 +2457,7 @@ window.addEventListener('load', () => {
     const fb = window._fb;
     try {
       await fb.addDoc(fb.collection(fb.db, 'chats', activeConvId, 'messages'), {
-        sender: 'admin',
-        text,
-        createdAt: fb.serverTimestamp()
+        sender: 'admin', text, createdAt: fb.serverTimestamp()
       });
       await fb.updateDoc(fb.doc(fb.db, 'chats', activeConvId), {
         lastMessage: text,
@@ -2437,16 +2469,28 @@ window.addEventListener('load', () => {
 
   adminSendBtn.addEventListener('click', sendAdminReply);
   adminInput.addEventListener('keydown', e => { if (e.key === 'Enter') sendAdminReply(); });
-
-  adminToggle.addEventListener('click', () => { window.openAdminPanel(); });
+  adminToggle.addEventListener('click', () => window.openAdminPanel());
   closeAdminBtn.addEventListener('click', closeAdminPanel);
-  logoutAdminBtn.addEventListener('click', () => {
-    localStorage.removeItem('lc_admin');
+
+  logoutAdminBtn.addEventListener('click', async () => {
+    const fb = window._fb;
+    if (fb) await fb.signOut(fb.auth);
     closeAdminPanel();
-    window.updateAdminVisibility();
+    window.deactivateAdminMode();
+    const toast = document.getElementById('agToast');
+    document.getElementById('agToastMsg').textContent = '✦ Admin abgemeldet.';
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 3200);
   });
 
-  // Comprobar al cargar si ya hay una sesión de admin activa
-  window.updateAdminVisibility();
+  // Si al cargar la página ya hay sesión activa de admin (Firebase persiste auth)
+  function waitForFb(cb, t=0) { if(window._fb) cb(); else if(t<50) setTimeout(()=>waitForFb(cb,t+1),100); }
+  waitForFb(() => {
+    window._fb.onAuthStateChanged(window._fb.auth, user => {
+      if (window.isAdminUser && window.isAdminUser(user)) {
+        window.activateAdminMode();
+      }
+    });
+  });
 })();
 </script></html>
