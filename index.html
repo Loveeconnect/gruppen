@@ -1882,13 +1882,79 @@ document.getElementById('lightboxOverlay').addEventListener('click', () => {
   document.getElementById('lightboxOverlay').classList.remove('open');
 });
 
-/* Sube una imagen a Firebase Storage y devuelve su URL pública */
+/* ╔══════════════════════════════════════════════════════════╗
+   ║  PON AQUÍ TU API KEY GRATUITA DE IMGBB                   ║
+   ║  Consíguela en: https://api.imgbb.com/  (botón           ║
+   ║  "Get API Key", requiere solo una cuenta gratis)          ║
+   ╚══════════════════════════════════════════════════════════╝ */
+const IMGBB_API_KEY = 'e7b47f40a48d8068ecb699153e244dcb';
+
+/* Convierte un File a string base64 (sin el prefijo "data:image/...;base64,") */
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(',')[1]);
+    reader.onerror = () => reject(new Error('Datei konnte nicht gelesen werden.'));
+    reader.readAsDataURL(file);
+  });
+}
+
+/* Sube una imagen a ImgBB (servicio externo gratuito, sin tarjeta) y devuelve su URL pública.
+   pathPrefix se usa solo para darle un nombre descriptivo a la imagen, no afecta dónde se guarda. */
+async function uploadImageToStorage(file, pathPrefix, timeoutMs = 25000) {
+  if (!IMGBB_API_KEY || IMGBB_API_KEY === 'PON_AQUI_TU_API_KEY_DE_IMGBB') {
+    throw new Error('⚙️ Es wurde noch kein ImgBB API-Key eingetragen. Bitte IMGBB_API_KEY im Code setzen.');
+  }
+
+  const withTimeout = (promise, label) => Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT_' + label)), timeoutMs))
+  ]);
+
+  try {
+    const base64 = await fileToBase64(file);
+    const safeName = (pathPrefix || 'img').replace(/[^a-zA-Z0-9_\-]/g, '_') + '_' + Date.now();
+
+    const formData = new FormData();
+    formData.append('image', base64);
+    formData.append('name', safeName);
+
+    const res = await withTimeout(
+      fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
+        method: 'POST',
+        body: formData
+      }),
+      'UPLOAD'
+    );
+
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      const apiMsg = data && data.error && data.error.message ? data.error.message : ('HTTP ' + res.status);
+      throw new Error('IMGBB_API_ERROR: ' + apiMsg);
+    }
+    return data.data.url; // URL pública directa de la imagen
+  } catch (e) {
+    console.error('uploadImageToStorage (ImgBB) error:', e);
+    let friendly = 'Fehler beim Hochladen.';
+    const msg = e && e.message ? e.message : '';
+    if (msg.startsWith('TIMEOUT')) {
+      friendly = '⏱ Zeitüberschreitung. ImgBB antwortet nicht — bitte Internetverbindung prüfen und erneut versuchen.';
+    } else if (msg.startsWith('IMGBB_API_ERROR')) {
+      friendly = '⚠️ ImgBB-Fehler: ' + msg.replace('IMGBB_API_ERROR: ', '') + '. Bitte API-Key prüfen.';
+    } else if (msg.startsWith('⚙️')) {
+      friendly = msg;
+    } else if (msg) {
+      friendly = msg;
+    }
+    const err = new Error(friendly);
+    err.original = e;
+    throw err;
+  }
+}
+
+/* Alias retro-compatible usado por el chat */
 async function uploadChatImage(file, pathPrefix) {
-  const fb = window._fb;
-  const safeName = Date.now() + '_' + Math.random().toString(36).slice(2,8) + '_' + file.name.replace(/[^a-zA-Z0-9.\-_]/g, '');
-  const storageRef = fb.ref(fb.storage, `${pathPrefix}/${safeName}`);
-  await fb.uploadBytes(storageRef, file);
-  return await fb.getDownloadURL(storageRef);
+  return uploadImageToStorage(file, pathPrefix);
 }
 
 /* Suscribe a los mensajes de la conversación actual */
@@ -2022,7 +2088,7 @@ async function handleUserSend() {
     }, { merge: true });
   } catch(e) {
     console.error('send message error:', e);
-    showToastGlobal('❌ Fehler beim Senden. Bitte erneut versuchen.');
+    showToastGlobal('❌ ' + (e && e.message ? e.message : 'Fehler beim Senden. Bitte erneut versuchen.'));
   }
 }
 
@@ -2599,10 +2665,7 @@ window.selectGender = function(g) {
         avEl.style.padding = '0'; avEl.style.overflow = 'hidden';
         avEl.innerHTML = '<div style="font-size:13px;">⏳</div>';
         try {
-          const safeName = Date.now() + '_' + file.name.replace(/[^a-zA-Z0-9.\-_]/g, '');
-          const storageRef = fb.ref(fb.storage, `avatars/${user.uid}/${safeName}`);
-          await fb.uploadBytes(storageRef, file);
-          const url = await fb.getDownloadURL(storageRef);
+          const url = await uploadImageToStorage(file, `avatars/${user.uid}`);
           await fb.updateProfile(user, { photoURL: url });
           await fb.setDoc(fb.doc(fb.db, 'users', user.uid), { uid: user.uid, photoUrl: url }, { merge: true });
           avEl.innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />`;
@@ -2612,7 +2675,7 @@ window.selectGender = function(g) {
         } catch(e) {
           console.error('avatar upload error:', e);
           avEl.innerHTML = prevHtml;
-          showToast('❌ Fehler beim Hochladen. Bitte erneut versuchen.');
+          showToast('❌ ' + (e && e.message ? e.message : 'Fehler beim Hochladen. Bitte erneut versuchen.'));
         }
       });
     }
@@ -2635,10 +2698,7 @@ window.selectGender = function(g) {
         const prevBg = coverEl.style.backgroundImage;
         coverEditBtn.textContent = '⏳ Lädt...';
         try {
-          const safeName = Date.now() + '_' + file.name.replace(/[^a-zA-Z0-9.\-_]/g, '');
-          const storageRef = fb.ref(fb.storage, `covers/${user.uid}/${safeName}`);
-          await fb.uploadBytes(storageRef, file);
-          const url = await fb.getDownloadURL(storageRef);
+          const url = await uploadImageToStorage(file, `covers/${user.uid}`);
           await fb.setDoc(fb.doc(fb.db, 'users', user.uid), { uid: user.uid, coverUrl: url }, { merge: true });
           coverEl.style.backgroundImage = `url('${url}')`;
           coverEditBtn.textContent = '📷 Titelbild';
@@ -2647,7 +2707,7 @@ window.selectGender = function(g) {
           console.error('cover upload error:', e);
           coverEl.style.backgroundImage = prevBg;
           coverEditBtn.textContent = '📷 Titelbild';
-          showToast('❌ Fehler beim Hochladen. Bitte erneut versuchen.');
+          showToast('❌ ' + (e && e.message ? e.message : 'Fehler beim Hochladen. Bitte erneut versuchen.'));
         }
       });
     }
@@ -2893,7 +2953,7 @@ window.selectGender = function(g) {
       });
     } catch(e) {
       console.error('admin reply error:', e);
-      showToastGlobal('❌ Fehler beim Senden. Bitte erneut versuchen.');
+      showToastGlobal('❌ ' + (e && e.message ? e.message : 'Fehler beim Senden. Bitte erneut versuchen.'));
     }
   }
 
